@@ -51,7 +51,7 @@ from totalsegmentator.alignment import as_closest_canonical_nifti, undo_canonica
 from totalsegmentator.alignment import as_closest_canonical, undo_canonical
 from totalsegmentator.resampling import change_spacing
 from totalsegmentator.libs import combine_masks, compress_nifti, check_if_shape_and_affine_identical, reorder_multilabel_like_v1
-from totalsegmentator.dicom_io import dcm_to_nifti, save_mask_as_rtstruct
+from totalsegmentator.dicom_io import dcm_to_nifti, save_mask_as_rtstruct, save_mask_as_dicomseg
 from totalsegmentator.cropping import crop_to_mask_nifti, undo_crop_nifti
 from totalsegmentator.cropping import crop_to_mask, undo_crop
 from totalsegmentator.postprocessing import remove_outside_of_mask, extract_skin, remove_auxiliary_labels
@@ -314,7 +314,7 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                          trainer="nnUNetTrainerV2", tta=False, multilabel_image=True,
                          resample=None, crop=None, crop_path=None, task_name="total", nora_tag="None", preview=False,
                          save_binary=False, nr_threads_resampling=1, nr_threads_saving=6, force_split=False,
-                         crop_addon=[3,3,3], roi_subset=None, output_type="nifti",
+                         crop_addon=[3,3,3], roi_subset=None, output_type="nifti", dicom_format="rtstruct",
                          statistics=False, quiet=False, verbose=False, test=0, skip_saving=False,
                          device="cuda", exclude_masks_at_border=True, no_derived_masks=False,
                          v1_order=False, stats_aggregation="mean", remove_small_blobs=False,
@@ -668,7 +668,14 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
 
             if output_type == "dicom":
                 file_out.mkdir(exist_ok=True, parents=True)
-                save_mask_as_rtstruct(img_data, selected_classes, file_in_dcm, file_out / "segmentations.dcm")
+                if dicom_format == "rtstruct":
+                    save_mask_as_rtstruct(img_data, selected_classes, file_in_dcm, file_out / "segmentations_rtstruct.dcm")
+                elif dicom_format == "seg":
+                    save_mask_as_dicomseg(img_data, selected_classes, file_in_dcm, file_out / "segmentations_seg.dcm")
+                else:
+                    raise ValueError(f"Invalid DICOM format: {dicom_format}. Must be 'rtstruct' or 'seg'.")
+                if not quiet: print(f"Saved segmentation as DICOM {dicom_format.upper()} to {file_out / 'segmentations_rtstruct_seg.dcm'}")
+
             else:
                 st = time.time()
                 if multilabel_image:

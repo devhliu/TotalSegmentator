@@ -12,8 +12,18 @@ import platform
 import requests
 import torch
 
-
 def get_totalseg_dir():
+    if "TOTALSEG_HOME_DIR" in os.environ:
+        totalseg_dir = Path(os.environ["TOTALSEG_HOME_DIR"])
+    else:
+        # in docker container finding home not properly working therefore map to /tmp
+        
+        totalseg_dir = Path(os.path.join(os.path.dirname(sys.executable), "models", "totalsegmentator"))
+        os.makedirs(totalseg_dir, exist_ok=True)
+    return totalseg_dir
+
+
+def get_totalseg_dir_LEGANCY():
     if "TOTALSEG_HOME_DIR" in os.environ:
         totalseg_dir = Path(os.environ["TOTALSEG_HOME_DIR"])
     else:

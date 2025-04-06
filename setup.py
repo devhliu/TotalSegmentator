@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 
 setup(name='TotalSegmentator',
-        version='2.7.0',
+        version='2.7.1',
         description='Robust segmentation of 104 classes in CT images.',
         long_description="See Readme.md on github for more details.",
         url='https://github.com/wasserth/TotalSegmentator',
@@ -28,7 +28,7 @@ setup(name='TotalSegmentator',
             },
         install_requires=[
             'torch>=2.1.2',  # torch < 2.6.0 required if using nnunetv2 < 2.6.0
-            'numpy<2',
+            'numpy',
             'SimpleITK',
             'nibabel>=2.3.0',
             'tqdm>=4.45.0',
@@ -39,7 +39,8 @@ setup(name='TotalSegmentator',
             'dicom2nifti',
             'pyarrow',
             'pydicom',
-            'highdicom'  # Add highdicom for DICOM SEG support
+            'highdicom',  # Add highdicom for DICOM SEG support
+            'rt_utils'
         ],
         zip_safe=False,
         classifiers=[
@@ -60,8 +61,7 @@ setup(name='TotalSegmentator',
                 'totalseg_set_license=totalsegmentator.bin.totalseg_set_license:main',
                 'totalseg_get_phase=totalsegmentator.bin.totalseg_get_phase:main',
                 'totalseg_get_modality=totalsegmentator.bin.totalseg_get_modality:main',
-                'totalseg_evans_index=totalsegmentator.bin.totalseg_evans_index:main',
-                'totalseg_dicom_seg=totalsegmentator.bin.totalseg_dicom_seg:main'  # Add new entry point
+                'totalseg_evans_index=totalsegmentator.bin.totalseg_evans_index:main'
             ],
         },
     )

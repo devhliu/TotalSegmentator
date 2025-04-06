@@ -27,8 +27,12 @@ def main():
                         type=lambda p: Path(p).absolute(), required=True)
 
     parser.add_argument("-ot", "--output_type", choices=["nifti", "dicom"],
-                    help="Select if segmentations shall be saved as Nifti or as Dicom RT Struct image.",
-                    default="nifti")
+                        help="Define output type. If dicom is selected a DICOM segmentation file will be created. (default: nifti)",
+                        default="nifti")
+
+    parser.add_argument("-df", "--dicom_format", choices=["rtstruct", "seg"],
+                        help="Define DICOM format for segmentation output. 'rtstruct' for DICOM RT Structure Set or 'seg' for DICOM Segmentation Object. Only used when output_type is 'dicom'. (default: rtstruct)",
+                        default="rtstruct")
 
     parser.add_argument("-ml", "--ml", action="store_true", help="Save one multilabel image for all classes",
                         default=False)
@@ -143,7 +147,7 @@ def main():
     totalsegmentator(args.input, args.output, args.ml, args.nr_thr_resamp, args.nr_thr_saving,
                      args.fast, args.nora_tag, args.preview, args.task, args.roi_subset,
                      args.statistics, args.radiomics, args.crop_path, args.body_seg,
-                     args.force_split, args.output_type, args.quiet, args.verbose, args.test, args.skip_saving,
+                     args.force_split, args.output_type, args.dicom_format, args.quiet, args.verbose, args.test, args.skip_saving,
                      args.device, args.license_number, not args.stats_include_incomplete,
                      args.no_derived_masks, args.v1_order, args.fastest, args.roi_subset_robust,
                      "mean", args.remove_small_blobs)

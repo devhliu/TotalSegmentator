@@ -1,20 +1,17 @@
 import os
-import sys
-import time
 import shutil
 import zipfile
-from pathlib import Path
 import subprocess
 import platform
 
 from tqdm import tqdm
+
 import numpy as np
-import nibabel as nib
 import dicom2nifti
+import pydicom
 
 from totalsegmentator.config import get_weights_dir
-
-
+from totalsegmentator.config import get_version
 
 def command_exists(command):
     return shutil.which(command) is not None
@@ -133,6 +130,34 @@ def dcm_to_nifti(input_path, output_path, tmp_dir=None, verbose=False):
     dicom2nifti.dicom_series_to_nifti(input_path, output_path, reorient_nifti=True)
 
 
+def load_dicom_series(dicom_dir):
+    """Load all DICOM files from a directory and sort them by instance number."""
+    dicom_files = []
+    supported_modalities = [
+        'CT Image Storage',
+        'MR Image Storage',
+        'Positron Emission Tomography Image Storage',
+        'Nuclear Medicine Image Storage'  # For SPECT
+    ]
+    
+    for root, _, files in os.walk(dicom_dir):
+        for file in files:
+            try:
+                dicom_path = os.path.join(root, file)
+                dcm = pydicom.dcmread(dicom_path, force=True)
+                if hasattr(dcm, 'SOPClassUID') and dcm.SOPClassUID.name in supported_modalities:
+                    dicom_files.append(dcm)
+            except:
+                pass
+    
+    if not dicom_files:
+        raise ValueError("No supported DICOM files found. Supported modalities: CT, MR, PET, SPECT")
+    
+    # Sort by instance number
+    dicom_files.sort(key=lambda x: int(x.InstanceNumber))
+    return dicom_files
+
+
 def save_mask_as_rtstruct(img_data, selected_classes, dcm_reference_file, output_path):
     """
     dcm_reference_file: a directory with dcm slices ??
@@ -144,13 +169,14 @@ def save_mask_as_rtstruct(img_data, selected_classes, dcm_reference_file, output
     # create new RT Struct - requires original DICOM
     rtstruct = RTStructBuilder.create_new(dicom_series_path=dcm_reference_file)
 
+    # Rotate segmentation to match DICOM orientation
+    img_data_rotated = np.rot90(img_data, 1, (0, 1))  # rotate segmentation in-plane
+
     # add mask to RT Struct
     for class_idx, class_name in tqdm(selected_classes.items()):
-        binary_img = img_data == class_idx
+        binary_img = img_data_rotated == class_idx
+        if class_name[0].islower(): continue  # skip first non upper character
         if binary_img.sum() > 0:  # only save none-empty images
-
-            # rotate nii to match DICOM orientation
-            binary_img = np.rot90(binary_img, 1, (0, 1))  # rotate segmentation in-plane
 
             # add segmentation to RT Struct
             rtstruct.add_roi(
@@ -159,3 +185,326 @@ def save_mask_as_rtstruct(img_data, selected_classes, dcm_reference_file, output
             )
 
     rtstruct.save(str(output_path))
+
+
+def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output_path):
+    """
+    Creates a DICOM Segmentation object using highdicom
+    
+    Parameters
+    ----------
+    img_data: numpy.ndarray
+        3D array with segmentation labels
+    selected_classes: dict
+        Dictionary mapping class indices to class names
+    dcm_reference_file: str or Path
+        Directory containing the source DICOM images
+    output_path: str or Path
+        Path where to save the DICOM SEG file
+    """
+    import highdicom as hd
+    from pydicom.sr.codedict import codes
+
+    import logging
+    logging.basicConfig(level=logging.WARNING)  # avoid messages from highdicom
+    
+    try:
+        # Load the original DICOM series
+        dicom_series = load_dicom_series(dcm_reference_file)
+        if not dicom_series:
+            raise ValueError("No DICOM files found in the reference directory")
+        
+        # Create segment descriptions
+        segment_descriptions = []
+        
+        # Track which segments are actually present in the data
+        present_segments = {}
+        
+        # Rotate segmentation to match DICOM orientation
+        img_data_rotated = np.rot90(img_data, 1, (0, 1))  # rotate segmentation in-plane
+
+        # First pass: identify which segments are present in the data
+        for class_idx, class_name in selected_classes.items():
+            if class_idx == 0:  # Skip background
+                continue
+            
+            if class_name[0].islower():
+                continue
+
+            # Create binary mask for this class
+            binary_img = img_data_rotated == class_idx
+            if binary_img.sum() > 0:  # only include non-empty segments
+                present_segments[class_idx] = class_name
+        
+        # Second pass: create segment descriptions for present segments
+        for segment_number, (class_idx, class_name) in enumerate(present_segments.items(), start=1):
+            # Create segment description
+            segment_descriptions.append(
+                hd.seg.SegmentDescription(
+                    segment_number=segment_number,
+                    segment_label=class_name,
+                    segmented_property_category=codes.cid7150.Tissue,
+                    segmented_property_type=codes.cid7166.ConnectiveTissue,
+                    algorithm_type=hd.seg.SegmentAlgorithmTypeValues.AUTOMATIC,
+                    algorithm_identification=hd.AlgorithmIdentificationSequence(
+                        name='TotalSegmentator',
+                        version=get_version(),
+                        family=codes.cid7162.ArtificialIntelligence
+                    ),
+                    tracking_uid=hd.UID(),
+                    tracking_id='TotalSegmentator'
+                )
+            )
+        
+        # Create a multi-class segmentation array where each class has its own channel
+        num_segments = len(segment_descriptions)
+        if num_segments == 0:
+            raise ValueError("No non-empty segments found in the segmentation data")
+        
+        # Create a binary multi-class segmentation array with correct dimensions
+        # highdicom expects: (num_segments, num_frames, rows, columns)
+        binary_seg_array = np.zeros((img_data_rotated.shape[2], img_data_rotated.shape[0], img_data_rotated.shape[1], num_segments), dtype=np.uint8)
+        
+        # Fill the binary segmentation array
+        img_data_rotated_transposed = np.transpose(img_data_rotated, (2, 0, 1))     # Transpose to (frames, rows, columns)
+        img_data_rotated_transposed = img_data_rotated_transposed[::-1, :, :]       # Flip the array to match DICOM orientation
+        for i, (class_idx, _) in enumerate(present_segments.items()):
+            # Convert to binary mask and transpose to match expected dimensions
+            mask = np.zeros(img_data_rotated_transposed.shape, dtype=np.uint8)
+            mask[img_data_rotated_transposed == class_idx] = 1
+            binary_seg_array[:, :, :, i] = mask
+        
+        # Get metadata from reference image
+        ref_image = dicom_series[0]
+        series_instance_uid = hd.UID()
+        
+        # Get original series description and number
+        original_series_description = ""
+        original_series_number = 0
+        
+        if hasattr(ref_image, 'SeriesDescription'):
+            original_series_description = ref_image.SeriesDescription
+        if hasattr(ref_image, 'SeriesNumber'):
+            original_series_number = ref_image.SeriesNumber
+        
+        # Create the Segmentation object
+        seg_dataset = hd.seg.Segmentation(
+            source_images=dicom_series,
+            pixel_array=binary_seg_array,       # Shape: (num_segments, frames, rows, columns)
+            segmentation_type=hd.seg.SegmentationTypeValues.BINARY,
+            segment_descriptions=segment_descriptions,
+            series_instance_uid=series_instance_uid,
+            series_number=original_series_number,
+            series_description=f"{original_series_description} Seg",
+            sop_instance_uid=hd.UID(),
+            instance_number=1,
+            manufacturer='TotalSegmentator',
+            manufacturer_model_name='TotalSegmentator',
+            software_versions=get_version(),
+            device_serial_number='1'
+        )
+        
+        # Save the DICOM SEG file
+        seg_dataset.save_as(output_path)
+        
+    except Exception as e:
+        print(f"Error creating DICOM SEG: {e}")
+        raise
+
+
+def save_mask_as_dicomseg_PYDICOM(img_data, selected_classes, dcm_reference_file, output_path):
+    """
+    Creates a DICOM Segmentation object using pydicom
+    
+    Parameters
+    ----------
+    img_data: numpy.ndarray
+        3D array with segmentation labels
+    selected_classes: dict
+        Dictionary mapping class indices to class names
+    dcm_reference_file: str or Path
+        Directory containing the source DICOM images
+    output_path: str or Path
+        Path where to save the DICOM SEG file
+    """
+    from pydicom.dataset import Dataset, FileDataset, FileMetaDataset
+    from pydicom.sequence import Sequence
+    from pydicom.uid import generate_uid
+    import datetime
+    import logging
+    
+    logging.basicConfig(level=logging.WARNING)  # avoid messages
+    
+    try:
+        # Load the original DICOM series
+        dicom_series = load_dicom_series(dcm_reference_file)
+        if not dicom_series:
+            raise ValueError("No DICOM files found in the reference directory")
+        
+        # Get reference image
+        ref_image = dicom_series[0]
+        
+        # Rotate segmentation to match DICOM orientation
+        img_data_rotated = np.rot90(img_data, 1, (0, 1))  # rotate segmentation in-plane
+        
+        # Track which segments are actually present in the data
+        present_segments = {}
+        
+        # First pass: identify which segments are present in the data
+        for class_idx, class_name in selected_classes.items():
+            if class_idx == 0:  # Skip background
+                continue
+            
+            if class_name[0].islower():  # Filter out classes that don't start with uppercase
+                continue
+                
+            # Create binary mask for this class
+            binary_img = img_data_rotated == class_idx
+            if binary_img.sum() > 0:  # only include non-empty segments
+                present_segments[class_idx] = class_name
+        
+        if not present_segments:
+            raise ValueError("No non-empty segments found in the segmentation data")
+        
+        # Create file meta information
+        file_meta = FileMetaDataset()
+        file_meta.MediaStorageSOPClassUID = '1.2.840.10008.5.1.4.1.1.66.4'  # Segmentation Storage
+        file_meta.MediaStorageSOPInstanceUID = generate_uid()
+        file_meta.TransferSyntaxUID = pydicom.uid.ExplicitVRLittleEndian
+        
+        # Create the FileDataset instance
+        seg_dataset = FileDataset(output_path, {}, file_meta=file_meta, preamble=b"\0" * 128)
+        
+        # Add the data elements
+        seg_dataset.SOPClassUID = '1.2.840.10008.5.1.4.1.1.66.4'  # Segmentation Storage
+        seg_dataset.SOPInstanceUID = file_meta.MediaStorageSOPInstanceUID
+        
+        # Patient information (copy from reference image)
+        for attr in ['PatientName', 'PatientID', 'PatientBirthDate', 'PatientSex']:
+            if hasattr(ref_image, attr):
+                setattr(seg_dataset, attr, getattr(ref_image, attr))
+        
+        # Study information (copy from reference image)
+        for attr in ['StudyInstanceUID', 'StudyID', 'StudyDate', 'StudyTime', 'AccessionNumber']:
+            if hasattr(ref_image, attr):
+                setattr(seg_dataset, attr, getattr(ref_image, attr))
+        
+        # Series information
+        seg_dataset.SeriesInstanceUID = generate_uid()
+        
+        # Get original series description and number
+        original_series_description = ""
+        original_series_number = 0
+        
+        if hasattr(ref_image, 'SeriesDescription'):
+            original_series_description = ref_image.SeriesDescription
+        if hasattr(ref_image, 'SeriesNumber'):
+            original_series_number = ref_image.SeriesNumber
+        
+        seg_dataset.SeriesDescription = f"{original_series_description} Seg"
+        seg_dataset.SeriesNumber = original_series_number
+        
+        # Instance information
+        seg_dataset.InstanceNumber = 1
+        
+        # Current date and time
+        dt = datetime.datetime.now()
+        seg_dataset.ContentDate = dt.strftime('%Y%m%d')
+        seg_dataset.ContentTime = dt.strftime('%H%M%S.%f')[:-3]
+        
+        # Segmentation specific attributes
+        seg_dataset.SegmentationType = 'BINARY'
+        seg_dataset.SegmentationFractionalType = 'PROBABILITY'
+        seg_dataset.MaximumFractionalValue = 1
+        
+        # Dimension Organization
+        seg_dataset.DimensionOrganizationType = 'TILED_FULL'
+        
+        # Create Segment Sequence
+        segment_sequence = []
+        for segment_number, (class_idx, class_name) in enumerate(present_segments.items(), start=1):
+            segment = Dataset()
+            segment.SegmentNumber = segment_number
+            segment.SegmentLabel = class_name
+            segment.SegmentAlgorithmType = 'AUTOMATIC'
+            segment.SegmentAlgorithmName = 'TotalSegmentator'
+            
+            # Segmented Property Category Code Sequence
+            category_code = Dataset()
+            category_code.CodeValue = 'T-D0050'
+            category_code.CodingSchemeDesignator = 'SRT'
+            category_code.CodeMeaning = 'Tissue'
+            segment.SegmentedPropertyCategoryCodeSequence = Sequence([category_code])
+            
+            # Segmented Property Type Code Sequence
+            type_code = Dataset()
+            type_code.CodeValue = 'T-D0050'
+            type_code.CodingSchemeDesignator = 'SRT'
+            type_code.CodeMeaning = class_name
+            segment.SegmentedPropertyTypeCodeSequence = Sequence([type_code])
+            
+            segment_sequence.append(segment)
+        
+        seg_dataset.SegmentSequence = Sequence(segment_sequence)
+        
+        # Create binary segmentation data
+        # Transpose to match DICOM orientation
+        img_data_rotated_transposed = np.transpose(img_data_rotated, (2, 0, 1))  # (frames, rows, columns)
+        img_data_rotated_transposed = img_data_rotated_transposed[::-1, :, :]    # Flip to match DICOM orientation
+        
+        # Create binary masks for each segment
+        binary_masks = []
+        for class_idx in present_segments.keys():
+            mask = np.zeros(img_data_rotated_transposed.shape, dtype=np.uint8)
+            mask[img_data_rotated_transposed == class_idx] = 1
+            binary_masks.append(mask)
+        
+        # Combine all masks into a single array
+        combined_mask = np.zeros(img_data_rotated_transposed.shape, dtype=np.uint8)
+        for i, mask in enumerate(binary_masks, start=1):
+            combined_mask[mask == 1] = i
+        
+        # Set pixel data
+        seg_dataset.NumberOfFrames = combined_mask.shape[0]
+        seg_dataset.Rows = combined_mask.shape[1]
+        seg_dataset.Columns = combined_mask.shape[2]
+        seg_dataset.BitsAllocated = 8
+        seg_dataset.BitsStored = 8
+        seg_dataset.HighBit = 7
+        seg_dataset.PixelRepresentation = 0
+        seg_dataset.SamplesPerPixel = 1
+        
+        # Flatten the array and convert to bytes
+        pixel_data = combined_mask.tobytes()
+        seg_dataset.PixelData = pixel_data
+        
+        # Reference the source images
+        shared_functional_groups_sequence = Dataset()
+        
+        # Derivation Image Sequence
+        derivation_image_sequence = []
+        for dcm in dicom_series:
+            derivation_image = Dataset()
+            derivation_image.ReferencedSOPClassUID = dcm.SOPClassUID
+            derivation_image.ReferencedSOPInstanceUID = dcm.SOPInstanceUID
+            derivation_image_sequence.append(derivation_image)
+        
+        shared_functional_groups_sequence.DerivationImageSequence = Sequence(derivation_image_sequence)
+        seg_dataset.SharedFunctionalGroupsSequence = Sequence([shared_functional_groups_sequence])
+        
+        # Per-frame Functional Groups Sequence
+        per_frame_functional_groups_sequence = []
+        for frame_idx in range(seg_dataset.NumberOfFrames):
+            frame_content = Dataset()
+            frame_content.FrameContentSequence = Sequence([Dataset()])
+            per_frame_functional_groups_sequence.append(frame_content)
+        
+        seg_dataset.PerFrameFunctionalGroupsSequence = Sequence(per_frame_functional_groups_sequence)
+        
+        # Save the DICOM SEG file
+        # Fix: Use enforce_file_format instead of write_like_original
+        seg_dataset.save_as(output_path, enforce_file_format=False)
+        
+    except Exception as e:
+        print(f"Error creating DICOM SEG: {e}")
+        raise

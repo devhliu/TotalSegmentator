@@ -67,7 +67,7 @@ def show_license_info():
 def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]=None, ml=False, nr_thr_resamp=1, nr_thr_saving=6,
                      fast=False, nora_tag="None", preview=False, task="total", roi_subset=None,
                      statistics=False, radiomics=False, crop_path=None, body_seg=False,
-                     force_split=False, output_type="nifti", quiet=False, verbose=False, test=0,
+                     force_split=False, output_type="nifti", dicom_format="rtstruct", quiet=False, verbose=False, test=0,
                      skip_saving=False, device="gpu", license_number=None,
                      statistics_exclude_masks_at_border=True, no_derived_masks=False,
                      v1_order=False, fastest=False, roi_subset_robust=None, stats_aggregation="mean",
@@ -100,9 +100,19 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
 
     if output_type == "dicom":
         try:
-            from rt_utils import RTStructBuilder
+            if dicom_format == "rtstruct":
+                from rt_utils import RTStructBuilder
+            elif dicom_format == "seg":
+                import highdicom
+            else:
+                raise ValueError(f"Invalid DICOM format: {dicom_format}. Must be 'rtstruct' or 'seg'.")
         except ImportError:
-            raise ImportError("rt_utils is required for output_type='dicom'. Please install it with 'pip install rt_utils'.")
+            if dicom_format == "rtstruct":
+                raise ImportError("rt_utils is required for output_type='dicom' with format='rtstruct'. Please install it with 'pip install rt_utils'.")
+            elif dicom_format == "seg":
+                raise ImportError("highdicom is required for output_type='dicom' with format='seg'. Please install it with 'pip install highdicom'.")
+            else:
+                raise ValueError(f"Invalid DICOM format: {dicom_format}. Must be 'rtstruct' or 'seg'.")
 
     # available devices: gpu | cpu | mps | gpu:1, gpu:2, etc.
     if device == "gpu": 
@@ -130,9 +140,9 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
     if license_number is not None:
         set_license_number(license_number)
 
-    if not get_config_key("statistics_disclaimer_shown"):  # Evaluates to True is variable not set (None) or set to False
-        print("TotalSegmentator sends anonymous usage statistics. If you want to disable it check the documentation.")
-        set_config_key("statistics_disclaimer_shown", True)
+    # if not get_config_key("statistics_disclaimer_shown"):  # Evaluates to True is variable not set (None) or set to False
+    #     print("TotalSegmentator sends anonymous usage statistics. If you want to disable it check the documentation.")
+    #     set_config_key("statistics_disclaimer_shown", True)
 
     from totalsegmentator.nnunet import nnUNet_predict_image  # this has to be after setting new env vars
 
@@ -627,19 +637,19 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
                             exclude_masks_at_border=statistics_exclude_masks_at_border,
                             no_derived_masks=no_derived_masks, v1_order=v1_order,
                             stats_aggregation=stats_aggregation, remove_small_blobs=remove_small_blobs,
-                            normalized_intensities=statistics_normalized_intensities)
+                            normalized_intensities=statistics_normalized_intensities, dicom_format=dicom_format)
     seg = seg_img.get_fdata().astype(np.uint8)
 
-    try:
-        # this can result in error if running multiple processes in parallel because all try to write the same file.
-        # Trying to fix with lock from portalocker did not work. Network drive seems to not support this locking.
-        config = increase_prediction_counter()
-        send_usage_stats(config, {"task": task, "fast": fast, "preview": preview,
-                                "multilabel": ml, "roi_subset": roi_subset,
-                                "statistics": statistics, "radiomics": radiomics})
-    except Exception as e:
-        # print(f"Error while sending usage stats: {e}")
-        pass
+    # try:
+    #     # this can result in error if running multiple processes in parallel because all try to write the same file.
+    #     # Trying to fix with lock from portalocker did not work. Network drive seems to not support this locking.
+    #     config = increase_prediction_counter()
+    #     send_usage_stats(config, {"task": task, "fast": fast, "preview": preview,
+    #                             "multilabel": ml, "roi_subset": roi_subset,
+    #                             "statistics": statistics, "radiomics": radiomics})
+    # except Exception as e:
+    #     # print(f"Error while sending usage stats: {e}")
+    #     pass
 
     if statistics:
         if not quiet: print("Calculating statistics...")

@@ -184,7 +184,8 @@ def save_mask_as_rtstruct(img_data, selected_classes, dcm_reference_file, output
                 name=class_name
             )
 
-    rtstruct.save(str(output_path))
+    # Fix the warnings by explicitly setting transfer syntax parameters
+    rtstruct.save(str(output_path), little_endian=True, implicit_vr=False)
 
 
 def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output_path):

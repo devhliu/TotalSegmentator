@@ -632,16 +632,16 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
                             normalized_intensities=statistics_normalized_intensities)
     seg = seg_img.get_fdata().astype(np.uint8)
 
-    try:
-        # this can result in error if running multiple processes in parallel because all try to write the same file.
-        # Trying to fix with lock from portalocker did not work. Network drive seems to not support this locking.
-        config = increase_prediction_counter()
-        send_usage_stats(config, {"task": task, "fast": fast, "preview": preview,
-                                "multilabel": ml, "roi_subset": roi_subset,
-                                "statistics": statistics, "radiomics": radiomics})
-    except Exception as e:
-        # print(f"Error while sending usage stats: {e}")
-        pass
+    # try:
+    #     # this can result in error if running multiple processes in parallel because all try to write the same file.
+    #     # Trying to fix with lock from portalocker did not work. Network drive seems to not support this locking.
+    #     config = increase_prediction_counter()
+    #     send_usage_stats(config, {"task": task, "fast": fast, "preview": preview,
+    #                             "multilabel": ml, "roi_subset": roi_subset,
+    #                             "statistics": statistics, "radiomics": radiomics})
+    # except Exception as e:
+    #     # print(f"Error while sending usage stats: {e}")
+    #     pass
 
     if statistics:
         if not quiet: print("Calculating statistics...")

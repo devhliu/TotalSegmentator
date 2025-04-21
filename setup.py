@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 
 setup(name='TotalSegmentator',
-        version='2.7.1',
+        version='2.8.0',
         description='Robust segmentation of 104 classes in CT images.',
         long_description="See Readme.md on github for more details.",
         url='https://github.com/wasserth/TotalSegmentator',
@@ -28,7 +28,7 @@ setup(name='TotalSegmentator',
             },
         install_requires=[
             'torch>=2.1.2',  # torch < 2.6.0 required if using nnunetv2 < 2.6.0
-            'numpy',
+            'numpy<2',
             'SimpleITK',
             'nibabel>=2.3.0',
             'tqdm>=4.45.0',

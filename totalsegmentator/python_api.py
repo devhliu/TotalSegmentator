@@ -71,7 +71,8 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
                      skip_saving=False, device="gpu", license_number=None,
                      statistics_exclude_masks_at_border=True, no_derived_masks=False,
                      v1_order=False, fastest=False, roi_subset_robust=None, stats_aggregation="mean",
-                     remove_small_blobs=False, statistics_normalized_intensities=False):
+                     remove_small_blobs=False, statistics_normalized_intensities=False, 
+                     robust_crop=False):
     """
     Run TotalSegmentator from within python.
 
@@ -437,9 +438,9 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         if fast: raise ValueError("task tissue_types does not work with option --fast")
         show_license_info()
     elif task == "tissue_types_mr":
-        task_id = 854
+        task_id = 925
         resample = 1.5
-        trainer = "nnUNetTrainer_2000epochs_NoMirroring"
+        trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
         crop = None
         model = "3d_fullres"
         folds = [0]
@@ -578,7 +579,8 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         body_seg = False  # can not be used together with body_seg
         st = time.time()
         if not quiet: print("Generating rough segmentation for cropping...")
-        if robust_rs:
+        if robust_rs or robust_crop:
+            print("  (Using more robust (but slower) 3mm model for cropping.)")
             crop_model_task = 852 if task.endswith("_mr") else 297
             crop_spacing = 3.0
         else:

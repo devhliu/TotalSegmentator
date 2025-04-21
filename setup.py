@@ -27,8 +27,8 @@ setup(name='TotalSegmentator',
              "resources/ct_brain_atlas_1mm.nii.gz"]
             },
         install_requires=[
-            'torch>=2.1.2',  # torch < 2.6.0 required if using nnunetv2 < 2.6.0
-            'numpy<2',
+            'torch>=2.6.0',
+            'numpy',
             'SimpleITK',
             'nibabel>=2.3.0',
             'tqdm>=4.45.0',

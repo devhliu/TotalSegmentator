@@ -184,8 +184,8 @@ def save_mask_as_rtstruct(img_data, selected_classes, dcm_reference_file, output
                 name=class_name
             )
 
-    # Fix the warnings by explicitly setting transfer syntax parameters
-    rtstruct.save(str(output_path), little_endian=True, implicit_vr=False)
+    # Save the RT Struct without unsupported keyword arguments
+    rtstruct.save(str(output_path))
 
 
 def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output_path):
@@ -503,8 +503,8 @@ def save_mask_as_dicomseg_PYDICOM(img_data, selected_classes, dcm_reference_file
         seg_dataset.PerFrameFunctionalGroupsSequence = Sequence(per_frame_functional_groups_sequence)
         
         # Save the DICOM SEG file
-        # Fix: Use enforce_file_format instead of write_like_original
-        seg_dataset.save_as(output_path, enforce_file_format=False)
+        # Use little_endian and implicit_vr arguments to suppress warnings and ensure compatibility
+        seg_dataset.save_as(output_path, write_like_original=False, little_endian=True, implicit_vr=False)
         
     except Exception as e:
         print(f"Error creating DICOM SEG: {e}")

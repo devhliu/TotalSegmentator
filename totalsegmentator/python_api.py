@@ -43,6 +43,27 @@ def convert_device_to_cuda(device):
         return f"cuda:{device.split(':')[1]}"
 
 
+def select_device(device):
+    device = convert_device_to_cuda(device)
+
+    # available devices: gpu | cpu | mps | gpu:1, gpu:2, etc.
+    if device == "gpu": 
+        device = "cuda"
+    if device.startswith("cuda"): 
+        if device == "cuda": device = "cuda:0"
+        if not torch.cuda.is_available():
+            print("No GPU detected. Running on CPU. This can be very slow. The '--fast' or the `--roi_subset` option can help to reduce runtime.")
+            device = "cpu"
+        else:
+            device_id = int(device[5:])
+            if device_id < torch.cuda.device_count():
+                device = torch.device(device)
+            else:
+                print("Invalid GPU config, running on the CPU")
+                device = "cpu"
+    return device
+
+
 def show_license_info():
     status, message = has_valid_license_offline()
     if status == "missing_license":
@@ -72,7 +93,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
                      statistics_exclude_masks_at_border=True, no_derived_masks=False,
                      v1_order=False, fastest=False, roi_subset_robust=None, stats_aggregation="mean",
                      remove_small_blobs=False, statistics_normalized_intensities=False, 
-                     robust_crop=False):
+                     robust_crop=False, higher_order_resampling=False, save_probabilities=None):
     """
     Run TotalSegmentator from within python.
 
@@ -97,31 +118,14 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
     initial_num_threads = torch.get_num_threads()
 
     validate_device_type_api(device)
-    device = convert_device_to_cuda(device)
-
+    device = select_device(device)
+    if verbose: print(f"Using Device: {device}")
+    
     if output_type == "dicom":
         try:
             from rt_utils import RTStructBuilder
         except ImportError:
             raise ImportError("rt_utils is required for output_type='dicom'. Please install it with 'pip install rt_utils'.")
-
-    # available devices: gpu | cpu | mps | gpu:1, gpu:2, etc.
-    if device == "gpu": 
-        device = "cuda"
-    if device.startswith("cuda"): 
-        if device == "cuda": device = "cuda:0"
-        if not torch.cuda.is_available():
-            print("No GPU detected. Running on CPU. This can be very slow. The '--fast' or the `--roi_subset` option can help to reduce runtime.")
-            device = "cpu"
-        else:
-            device_id = int(device[5:])
-            if device_id < torch.cuda.device_count():
-                device = torch.device(device)
-            else:
-                print("Invalid GPU config, running on the CPU")
-                device = "cpu"
-    if verbose: print(f"Using Device: {device}")
-
 
     if not quiet:
         print("\nIf you use this tool please cite: https://pubs.rsna.org/doi/10.1148/ryai.230024\n")
@@ -138,7 +142,8 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
     from totalsegmentator.nnunet import nnUNet_predict_image  # this has to be after setting new env vars
 
     crop_addon = [3, 3, 3]  # default value
-
+    cascade = None
+    
     if task == "total":
         if fast:
             task_id = 297
@@ -159,6 +164,20 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
             trainer = "nnUNetTrainerNoMirroring"
             crop = None
         model = "3d_fullres"
+        folds = [0]
+    # todo: add to download and preview
+    elif task == "total_highres_test":
+        # task_id = 955
+        task_id = 956
+        # resample = [0.75, 0.75, 1.0]
+        resample = [0.78125, 0.78125, 1.0]
+        trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
+        crop_addon = [30, 30, 30]
+        crop = ["liver", "spleen", "colon", "small_bowel", "stomach", "lung_upper_lobe_left", "lung_upper_lobe_right", "aorta"] # abdomen_thorax
+        # model = "3d_fullres_high"
+        # model = "3d_fullres_high_bigPS"
+        model = "3d_fullres"
+        cascade = True
         folds = [0]
     elif task == "total_mr":
         if fast:
@@ -251,7 +270,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
             folds = [0]
     elif task == "vertebrae_mr":
         task_id = 756
-        resample = None
+        resample = 1.5
         trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
         crop = None
         model = "3d_fullres"
@@ -378,6 +397,15 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         model = "3d_fullres"
         folds = [0]
         if fast: raise ValueError("task liver_segments_mr does not work with option --fast")
+    elif task == "craniofacial_structures":
+        task_id = 115
+        resample = [0.5, 0.5, 0.5]
+        trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
+        crop = ["skull"]
+        crop_addon = [20, 20, 20]
+        model = "3d_fullres"
+        folds = [0]
+        if fast: raise ValueError("task craniofacial_structures does not work with option --fast")
 
         
     # Commercial models
@@ -465,7 +493,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         show_license_info()
     elif task == "brain_structures":
         task_id = 409
-        resample = [1.0, 0.5, 0.5]
+        resample = [0.5, 0.5, 1.0]
         trainer = "nnUNetTrainer_DASegOrd0"
         crop = ["brain"]
         crop_addon = [10, 10, 10]
@@ -564,7 +592,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
 
     # Generate rough organ segmentation (6mm) for speed up if crop or roi_subset is used
     # (for "fast" on GPU it makes no big difference, but on CPU it can help even for "fast")
-    if crop is not None or roi_subset is not None:
+    if crop is not None or roi_subset is not None or cascade:
 
         body_seg = False  # can not be used together with body_seg
         st = time.time()
@@ -602,6 +630,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         crop_mask = nib.Nifti1Image(crop_mask, organ_seg.affine)
         crop_addon = [20,20,20]
         crop = crop_mask
+        cascade = crop_mask if cascade else None
         if verbose: print(f"Rough organ segmentation generated in {time.time()-st:.2f}s")
 
     # Generate rough body segmentation (6mm) (speedup for big images; not useful in combination with --fast option)
@@ -629,7 +658,9 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
                             exclude_masks_at_border=statistics_exclude_masks_at_border,
                             no_derived_masks=no_derived_masks, v1_order=v1_order,
                             stats_aggregation=stats_aggregation, remove_small_blobs=remove_small_blobs,
-                            normalized_intensities=statistics_normalized_intensities)
+                            normalized_intensities=statistics_normalized_intensities, 
+                            nnunet_resampling=higher_order_resampling, save_probabilities=save_probabilities,
+                            cascade=cascade)
     seg = seg_img.get_fdata().astype(np.uint8)
 
     # try:

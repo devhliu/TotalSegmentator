@@ -185,7 +185,8 @@ def nnUNet_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
 def nnUNetv2_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
                      trainer="nnUNetTrainer", tta=False,
                      num_threads_preprocessing=3, num_threads_nifti_save=2,
-                     plans="nnUNetPlans", device="cuda", quiet=False, step_size=0.5):
+                     plans="nnUNetPlans", device="cuda", quiet=False, step_size=0.5,
+                     save_probabilities_path=None):
     """
     Identical to bash function nnUNetv2_predict
     """
@@ -213,7 +214,10 @@ def nnUNetv2_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
         device = torch.device('mps')
     disable_tta = not tta
     verbose = False
-    save_probabilities = False
+    if save_probabilities_path is None:
+        save_probabilities = False
+    else:
+        save_probabilities = True
     continue_prediction = False
     chk = "checkpoint_final.pth"
     npp = num_threads_preprocessing
@@ -279,6 +283,10 @@ def nnUNetv2_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
                                  folder_with_segs_from_prev_stage=prev_stage_predictions,
                                  num_parts=num_parts, part_id=part_id)
 
+    if save_probabilities:
+        shutil.copy(Path(dir_out) / "s01.npz", save_probabilities_path)
+        shutil.copy(Path(dir_out) / "s01.pkl", save_probabilities_path.with_suffix(".pkl"))
+
     # # Use numpy as input. TODO: In entire pipeline do not save to disk
     # input_image = nib.load(Path(dir_in) / "s01_0000.nii.gz")
     # input_data = np.asanyarray(input_image.dataobj).transpose(2, 1, 0)[None,...].astype(np.float32)
@@ -318,10 +326,12 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                          statistics=False, quiet=False, verbose=False, test=0, skip_saving=False,
                          device="cuda", exclude_masks_at_border=True, no_derived_masks=False,
                          v1_order=False, stats_aggregation="mean", remove_small_blobs=False,
-                         normalized_intensities=False):
+                         normalized_intensities=False, nnunet_resampling=False,
+                         save_probabilities=None, cascade=None):
     """
     crop: string or a nibabel image
     resample: None or float (target spacing for all dimensions) or list of floats
+    cascade: nibabel image or None
     """
     if not isinstance(file_in, Nifti1Image):
         file_in = Path(file_in)
@@ -426,12 +436,15 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                         subprocess.call(f"/opt/nora/src/node/nora -p {nora_tag} --add {file_out} --addtag atlas", shell=True)
                 return img_out, img_in_orig, None
                 
-            img_in, bbox = crop_to_mask(img_in, crop_mask_img, addon=crop_addon, dtype=np.int32,
-                                      verbose=verbose)
+            img_in, bbox = crop_to_mask(img_in, crop_mask_img, addon=crop_addon, dtype=np.int32, verbose=verbose)
+            if cascade:
+                cascade, _ = crop_to_mask(cascade, crop_mask_img, addon=crop_addon, dtype=np.uint8, verbose=verbose)
             if not quiet:
                 print(f"  cropping from {crop_mask_img.shape} to {img_in.shape}")
 
         img_in = as_closest_canonical(img_in)
+        if cascade:
+            cascade = as_closest_canonical(cascade)
 
         if resample is not None:
             if not quiet: print("Resampling...")
@@ -440,6 +453,9 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
             img_in_zooms = img_in.header.get_zooms()
             img_in_rsp = change_spacing(img_in, resample,
                                         order=3, dtype=np.int32, nr_cpus=nr_threads_resampling)  # 4 cpus instead of 1 makes it a bit slower
+            if cascade:
+                cascade = change_spacing(cascade, resample,
+                                         order=0, dtype=np.uint8, nr_cpus=nr_threads_resampling)
             if verbose:
                 print(f"  from shape {img_in.shape} to shape {img_in_rsp.shape}")
             if not quiet: print(f"  Resampled in {time.time() - st:.2f}s")
@@ -447,6 +463,9 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
             img_in_rsp = img_in
 
         nib.save(img_in_rsp, tmp_dir / "s01_0000.nii.gz")
+
+        if cascade:
+            nib.save(cascade, tmp_dir / "s01_0001.nii.gz")
 
         # todo important: change
         nr_voxels_thr = 512*512*900
@@ -458,6 +477,8 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
         do_triple_split = np.prod(ss) > nr_voxels_thr and ss[2] > 200 and multimodel
         if force_split:
             do_triple_split = True
+        if cascade:
+            do_triple_split = False
         if do_triple_split:
             if not quiet: print("Splitting into subparts...")
             img_parts = ["s01", "s02", "s03"]
@@ -513,7 +534,8 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                         #                nr_threads_resampling, nr_threads_saving)
                         nnUNetv2_predict(tmp_dir, tmp_dir, tid, model, folds, trainer, tta,
                                          nr_threads_resampling, nr_threads_saving,
-                                         device=device, quiet=quiet, step_size=step_size)
+                                         device=device, quiet=quiet, step_size=step_size,
+                                         save_probabilities_path=save_probabilities)
                     # iterate over models (different sets of classes)
                     for img_part in img_parts:
                         (tmp_dir / f"{img_part}.nii.gz").rename(tmp_dir / "parts" / f"{img_part}_{tid}.nii.gz")
@@ -534,7 +556,8 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                     #                nr_threads_resampling, nr_threads_saving)
                     nnUNetv2_predict(tmp_dir, tmp_dir, task_id, model, folds, trainer, tta,
                                      nr_threads_resampling, nr_threads_saving,
-                                     device=device, quiet=quiet, step_size=step_size)
+                                     device=device, quiet=quiet, step_size=step_size,
+                                     save_probabilities_path=save_probabilities)
             # elif test == 2:
             #     print("WARNING: Using reference seg instead of prediction for testing.")
             #     shutil.copy(Path("tests") / "reference_files" / "example_seg_fast.nii.gz", tmp_dir / f"s01.nii.gz")
@@ -624,9 +647,29 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
             if verbose: print(f"  back to original shape: {img_in_shape}")
             # Use force_affine otherwise output affine sometimes slightly off (which then is even increased
             # by undo_canonical)
-            img_pred = change_spacing(img_pred, resample, img_in_shape,
-                                      order=0, dtype=np.uint8, nr_cpus=nr_threads_resampling,
-                                      force_affine=img_in.affine)
+
+            # Advantage of nnunet_resampling: Will convert multilabel to one-hot and then high order 
+            # resampling (= smoother) is possible. Disadvantage: slower and uses a lot of memory if many labels.
+            # Ok if using with "roi_subset" because then only a few labels, otherwise infeasible runtime+memory.
+            if nnunet_resampling:
+                if roi_subset is not None:
+                    img_data_tmp = img_pred.get_fdata()
+                    img_data_tmp *= np.isin(img_data_tmp, list(label_map.keys()))
+                    img_pred = nib.Nifti1Image(img_data_tmp, img_pred.affine)
+            
+                # Order:
+                # 0: roughy and uneven
+                # 1: best (smoothest)
+                # 2: somehow more uneven again
+                # 3: identical to 2
+                img_pred = change_spacing(img_pred, resample, img_in_shape,
+                                          order=1, dtype=np.uint8, nr_cpus=nr_threads_resampling,
+                                          force_affine=img_in.affine, nnunet_resample=True)
+            else:
+                img_pred = change_spacing(img_pred, resample, img_in_shape,
+                                        order=0, dtype=np.uint8, nr_cpus=nr_threads_resampling,
+                                        force_affine=img_in.affine)
+            
 
         if verbose: print("Undoing canonical...")
         img_pred = undo_canonical(img_pred, img_in_orig)

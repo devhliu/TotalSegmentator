@@ -241,6 +241,12 @@ def download_pretrained_weights(task_id):
     elif task_id == 552:
         weights_path = config_dir / "Dataset552_ventricle_parts_38subj"
         WEIGHTS_URL = url + "/v2.5.0-weights/Dataset552_ventricle_parts_38subj.zip"
+    elif task_id == 955:
+        weights_path = config_dir / "Dataset955_TotalSegmentator_highres_part1_organs_110subj"
+        WEIGHTS_URL = "TODO"
+    elif task_id == 956:
+        weights_path = config_dir / "Dataset956_TotalSegmentator_highres_part1_organs_cascade_110subj"
+        WEIGHTS_URL = "TODO"
                 
     # MR models
     elif task_id == 850:
@@ -307,6 +313,9 @@ def download_pretrained_weights(task_id):
     elif task_id == 576:
         weights_path = config_dir / "Dataset576_mri_liver_segments_120subj"
         WEIGHTS_URL = url + "/v2.5.0-weights/Dataset576_mri_liver_segments_120subj.zip"
+    elif task_id == 115:
+        weights_path = config_dir / "Dataset115_mandible"
+        WEIGHTS_URL = url + "/v2.5.0-weights/Dataset115_mandible.zip"
 
     # Commercial models
     elif task_id == 304:

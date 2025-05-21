@@ -1,6 +1,6 @@
 # TotalSegmentator
 
-Tool for segmentation of most major anatomical structures in any CT or MR image. It was trained on a wide range of different CT and MR images (different scanners, institutions, protocols,...) and therefore should work well on most images. A large part of the training dataset can be downloaded here: [CT dataset](https://doi.org/10.5281/zenodo.6802613) (1228 subjects) and [MR dataset](https://zenodo.org/doi/10.5281/zenodo.11367004) (616 subjects). You can also try the tool online at [totalsegmentator.com](https://totalsegmentator.com/) or as [3D Slicer extension](https://github.com/lassoan/SlicerTotalSegmentator).
+Tool for segmentation of most major anatomical structures in any CT or MR image. It was trained on a wide range of different CT and MR images (different scanners, institutions, protocols,...) and therefore works well on most images. A large part of the training dataset can be downloaded here: [CT dataset](https://doi.org/10.5281/zenodo.6802613) (1228 subjects) and [MR dataset](https://zenodo.org/doi/10.5281/zenodo.11367004) (616 subjects). You can also try the tool online at [totalsegmentator.com](https://totalsegmentator.com/) or as [3D Slicer extension](https://github.com/lassoan/SlicerTotalSegmentator).
 
 **ANNOUNCEMENT: We created a platform where anyone can help annotate more data to further improve TotalSegmentator: [TotalSegmentator Annotation Platform](https://annotate.totalsegmentator.com).**  
   
@@ -46,7 +46,7 @@ TotalSegmentator -i mri.nii.gz -o segmentations --task total_mr
 
 > Note: If you run on CPU use the option `--fast` or `--roi_subset` to greatly improve runtime.
 
-> Note: This is not a medical device and is not intended for clinical usage.
+> Note: This is not a medical device and is not intended for clinical usage. However, it is part of several FDA-approved products, where it has been certified as a component of the overall system.
 
 
 ### Subtasks
@@ -55,7 +55,7 @@ TotalSegmentator -i mri.nii.gz -o segmentations --task total_mr
 
 Next to the default task (`total`) there are more subtasks with more classes. If the taskname ends with `_mr` it works for MR images, otherwise for CT images.
 
-Openly available for any usage:
+Openly available for any usage (Apache-2.0 license):
 * **total**: default task containing 117 main classes (see [here](https://github.com/wasserth/TotalSegmentator#class-details) for a list of classes)
 * **total_mr**: default task containing 50 main classes on MR images (see [here](https://github.com/wasserth/TotalSegmentator#class-details) for a list of classes)
 * **lung_vessels**: lung_vessels (cite [paper](https://www.sciencedirect.com/science/article/pii/S0720048X22001097)), lung_trachea_bronchia
@@ -76,7 +76,7 @@ Openly available for any usage:
 * **breasts**: breast
 * **liver_segments**: liver_segment_1, liver_segment_2, liver_segment_3, liver_segment_4, liver_segment_5, liver_segment_6, liver_segment_7, liver_segment_8 (Couinaud segments)
 * **liver_segments_mr**: liver_segment_1, liver_segment_2, liver_segment_3, liver_segment_4, liver_segment_5, liver_segment_6, liver_segment_7, liver_segment_8 (for MR images) (Couinaud segments)
-
+* **craniofacial_structures**: mandible, teeth_lower, skull, head, sinus_maxillary, sinus_frontal, teeth_upper
 *: These models are not trained on the full totalsegmentator dataset but on some small other datasets. Therefore, expect them to work less robustly.
 
 Available with a license (free licenses available for non-commercial usage [here](https://backend.totalsegmentator.com/license-academic/). For a commercial license contact jakob.wasserthal@usb.ch):
@@ -102,6 +102,8 @@ TotalSegmentator -i ct.nii.gz -o segmentations -ta <task_name>
 Confused by all the structures and tasks? Check [this](https://backend.totalsegmentator.com/find-task/) to search through available structures and tasks.
 
 The mapping from label ID to class name can be found [here](https://github.com/wasserth/TotalSegmentator/blob/master/totalsegmentator/map_to_binary.py).
+
+If you have a nnU-Net model for some structures not supported yet, you can contribute it. This will enable all TotalSegmentator users to easily use it and at the same time increase the reach of your research. Contact jakob.wasserthal@usb.ch.
 
 
 ### Advanced settings
@@ -145,6 +147,13 @@ This will download them to `~/.totalsegmentator/nnunet/results`. You can change 
 After acquiring a license number for the non-open tasks you can set it with the following command:
 ```
 totalseg_set_license -l aca_12345678910
+```
+
+You can output the softmax probabilities. This will give you a `.npz` file you can load with numpy. The geometry
+might not be identical to your input image. There will also be a `.pkl` output file with geometry
+information. This does not work well for the `total` task since this is based on multiple models.
+```
+TotalSegmentator -i ct.nii.gz -o seg -ta lung_nodules --save_probabilities probs.npz
 ```
 
 If you do not have internet access on the machine you want to run TotalSegmentator on:
@@ -240,8 +249,9 @@ pip install SimpleITK==2.0.2
 Alternatively you can try
 ```
 fslorient -copysform2qform input_file
-fslreorient2std input_file output_file
+[fslreorient2std input_file output_file]
 ```
+or use [this python command](https://github.com/MIC-DKFZ/nnDetection/issues/24#issuecomment-2627684467).
 
 **Bad segmentations**
 When you get bad segmentation results check the following:

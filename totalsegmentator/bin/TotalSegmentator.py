@@ -66,7 +66,8 @@ def main():
                         "head_glands_cavities", "head_muscles", "headneck_bones_vessels", "headneck_muscles",
                         "brain_structures", "liver_vessels", "oculomotor_muscles",
                         "thigh_shoulder_muscles", "thigh_shoulder_muscles_mr", "lung_nodules", "kidney_cysts", 
-                        "breasts", "ventricle_parts", "aortic_sinuses", "liver_segments", "liver_segments_mr"],
+                        "breasts", "ventricle_parts", "aortic_sinuses", "liver_segments", "liver_segments_mr",
+                        "total_highres_test", "craniofacial_structures"],
                         help="Select which model to use. This determines what is predicted.",
                         default="total")
 
@@ -80,6 +81,10 @@ def main():
                         help="Like roi_subset but uses a slower but more robust model to find the rois.")
 
     parser.add_argument("-rc", "--robust_crop", action="store_true", help="For cropping (which is required for several task) or roi_subset, use the more robust 3mm model instead of the default and faster 6mm model.",
+                        default=False)
+
+    parser.add_argument("-ho", "--higher_order_resampling", action="store_true", 
+                        help="Use higher order resampling for segmentations. Results in smoother segmentations on high resolution images but uses more runtime + memory.",
                         default=False)
 
     parser.add_argument("-s", "--statistics", action="store_true",
@@ -129,6 +134,9 @@ def main():
     parser.add_argument("-q", "--quiet", action="store_true", help="Print no intermediate outputs",
                         default=False)
 
+    parser.add_argument("-sp", "--save_probabilities", help="Save probabilities to this path. Only for experienced users. Python skills required.",
+                        type=lambda p: Path(p).absolute())
+
     parser.add_argument("-v", "--verbose", action="store_true", help="Show more intermediate output",
                         default=False)
 
@@ -154,7 +162,8 @@ def main():
                      args.force_split, args.output_type, args.dicom_format, args.quiet, args.verbose, args.test, args.skip_saving,
                      args.device, args.license_number, not args.stats_include_incomplete,
                      args.no_derived_masks, args.v1_order, args.fastest, args.roi_subset_robust,
-                     "mean", args.remove_small_blobs, False, args.robust_crop)
+                     "mean", args.remove_small_blobs, False, args.robust_crop, args.higher_order_resampling,
+                     args.save_probabilities)
 
 
 if __name__ == "__main__":

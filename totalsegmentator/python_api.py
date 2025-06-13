@@ -172,22 +172,34 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
             task_id = [291, 292, 293, 294, 295]
             resample = 1.5
             trainer = "nnUNetTrainerNoMirroring"
+            # trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
             crop = None
         model = "3d_fullres"
         folds = [0]
     # todo: add to download and preview
+    # elif task == "total_highres_test":
+    #     # task_id = 955
+    #     task_id = 956
+    #     # resample = [0.75, 0.75, 1.0]
+    #     resample = [0.78125, 0.78125, 1.0]
+    #     trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
+    #     crop_addon = [30, 30, 30]
+    #     crop = ["liver", "spleen", "colon", "small_bowel", "stomach", "lung_upper_lobe_left", "lung_upper_lobe_right", "aorta"] # abdomen_thorax
+    #     # model = "3d_fullres_high"
+    #     # model = "3d_fullres_high_bigPS"
+    #     model = "3d_fullres"
+    #     cascade = True
+    #     folds = [0]
     elif task == "total_highres_test":
-        # task_id = 955
-        task_id = 956
-        # resample = [0.75, 0.75, 1.0]
-        resample = [0.78125, 0.78125, 1.0]
-        trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
-        crop_addon = [30, 30, 30]
-        crop = ["liver", "spleen", "colon", "small_bowel", "stomach", "lung_upper_lobe_left", "lung_upper_lobe_right", "aorta"] # abdomen_thorax
-        # model = "3d_fullres_high"
+        task_id = 957
+        resample = [0.75, 0.75, 1.0]
+        trainer = "nnUNetTrainerNoMirroring"
+        # crop_addon = [30, 30, 30]
+        # crop = ["liver", "spleen", "colon", "small_bowel", "stomach", "lung_upper_lobe_left", "lung_upper_lobe_right", "aorta"] # abdomen_thorax
+        crop = None
+        model = "3d_fullres_high"
         # model = "3d_fullres_high_bigPS"
-        model = "3d_fullres"
-        cascade = True
+        cascade = False
         folds = [0]
     elif task == "total_mr":
         if fast:
@@ -416,6 +428,17 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         model = "3d_fullres"
         folds = [0]
         if fast: raise ValueError("task craniofacial_structures does not work with option --fast")
+    # This model only segments within T4-L4. In training only labels in this region were annotated. Therefore,
+    # I do not have to crop to this region, but model automatically only predicts in this region.
+    elif task == "abdominal_muscles":
+        task_id = 952
+        resample = [0.75, 0.75, 1]
+        trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
+        crop = ["body_trunc"]
+        crop_addon = [5, 5, 5]
+        model = "3d_fullres_high"
+        folds = [0]
+        if fast: raise ValueError("task abdominal_muscles does not work with option --fast")
 
         
     # Commercial models
@@ -622,6 +645,11 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
                 crop_spacing = 6.0
         crop_task = "total_mr" if task.endswith("_mr") else "total"
         crop_trainer = "nnUNetTrainer_2000epochs_NoMirroring" if task.endswith("_mr") else "nnUNetTrainer_4000epochs_NoMirroring"
+        if crop is not None and ("body_trunc" in crop or "body_extremities" in crop):
+            crop_model_task = 300
+            crop_spacing = 6.0
+            crop_trainer = "nnUNetTrainer"
+            crop_task = "body"
         download_pretrained_weights(crop_model_task)
         
         organ_seg, _, _ = nnUNet_predict_image(input, None, crop_model_task, model="3d_fullres", folds=[0],

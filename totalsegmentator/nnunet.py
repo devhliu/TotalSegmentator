@@ -193,6 +193,9 @@ def nnUNetv2_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
     dir_in = str(dir_in)
     dir_out = str(dir_out)
 
+    # if task_id in [291, 292, 293, 294, 295, 957]:
+    #     plans = "nnUNetResEncUNetLPlans_8"
+
     model_folder = get_output_folder(task_id, trainer, plans, model)
 
     assert device in ['cpu', 'cuda',
@@ -431,10 +434,18 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                 img_out = nib.Nifti1Image(np.zeros(img_in.shape, dtype=np.uint8), img_in.affine)
                 img_out = add_label_map_to_nifti(img_out, label_map)
                 if file_out is not None:
-                    nib.save(img_out, file_out)
-                    if nora_tag != "None":
-                        subprocess.call(f"/opt/nora/src/node/nora -p {nora_tag} --add {file_out} --addtag atlas", shell=True)
-                return img_out, img_in_orig, None
+                    if multilabel_image:
+                        file_out.parent.mkdir(exist_ok=True, parents=True)
+                        nib.save(img_out, file_out)
+                    else:
+                        file_out.mkdir(exist_ok=True, parents=True)
+                        # Save an empty nifti for each roi in roi_subset
+                        empty_img = np.zeros(img_in.shape, dtype=np.uint8)
+                        for _, roi_name in label_map.items():
+                            nib.save(nib.Nifti1Image(empty_img, img_in.affine), file_out / f"{roi_name}.nii.gz")
+                        if nora_tag != "None":
+                            subprocess.call(f"/opt/nora/src/node/nora -p {nora_tag} --add {file_out} --addtag atlas", shell=True)
+                    return img_out, img_in_orig, None
                 
             img_in, bbox = crop_to_mask(img_in, crop_mask_img, addon=crop_addon, dtype=np.int32, verbose=verbose)
             if cascade:

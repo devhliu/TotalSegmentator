@@ -1,4 +1,6 @@
 ## Master
+* add multilabel input support to `totalseg_combine_masks`
+* remove numpy < 2 requirement
 
 
 ## Release 2.10.0
@@ -8,7 +10,7 @@
 ## Release 2.9.0
 * use `--higher_order_resampling` argument
 * add `--save_probabilities` argument: save softmax probabilities. Very experimental. Requires python skills.
-* bugfix in task `brain_structures`: resampling was in different order than model. resulted in slower runtime and higher RAM usage and slightly reduced accuracy.
+* bugfix in task `brain_structures`: resampling was in different order than model, resulting in slower runtime and higher RAM usage and slightly reduced accuracy.
 * add `craniofacial_structures` task: add skull, mandible, teeth, sinus, etc.
 
 
@@ -104,7 +106,7 @@
 ## Release 2.0.2
 * allow more than 10 classes in `--roi_subset`
 * bugfix in `appendicular_bones` auxiliary mapping
-* in multilable output only show classes selected in `--roi_subset` if selected
+* in multilabel output only show classes selected in `--roi_subset` if selected
 * make statistics work with dicom input
 
 
@@ -184,7 +186,7 @@
 
 
 ## Release 1.1
-* Optimise statistics runtime
+* Optimize statistics runtime
 * fix server bugs
 * add radiomics feature calculation
 

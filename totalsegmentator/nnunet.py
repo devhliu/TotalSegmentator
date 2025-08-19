@@ -193,6 +193,9 @@ def nnUNetv2_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
     dir_in = str(dir_in)
     dir_out = str(dir_out)
 
+    # Handle specific task IDs that use different plans
+    if task_id == 1001:  # Dataset1001_MuscleFatComposition
+        plans = "nnUNetResEncUNetXLPlans"
     # if task_id in [291, 292, 293, 294, 295, 957]:
     #     plans = "nnUNetResEncUNetLPlans_8"
 

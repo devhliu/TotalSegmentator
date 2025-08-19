@@ -573,6 +573,16 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         if fast: raise ValueError("task aortic_sinuses does not work with option --fast")
         show_license_info()
 
+    elif task == "muscle_fat_composition":
+        task_id = 1001
+        resample = 1.0  # Based on recommended spacing [1.0, 1.0, 1.0]
+        trainer = "nnUNetTrainer"  # Default trainer for 2d configuration
+        crop_addon = [20, 20, 20]  # Keep existing crop addon for abdominal region
+        crop = None  # No specific crop region needed
+        model = "2d"  # Based on plans.json showing 2d configuration
+        folds = [0]  # Single fold as shown in checkpoint structure
+        if fast: raise ValueError("task muscle_fat_composition does not work with option --fast")
+
     elif task == "test":
         task_id = [517]
         resample = None
@@ -580,6 +590,9 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         crop = "body"
         model = "3d_fullres"
         folds = [0]
+        
+    else:
+        raise ValueError(f"Unknown task: {task}. Please check the available tasks in the documentation.")
 
     crop_path = output if crop_path is None else crop_path
 

@@ -685,6 +685,12 @@ class_map = {
         21: "quadratus_lumborum_right",
         22: "quadratus_lumborum_left"
     },
+    "muscle_fat_composition": {
+        1: "muscle",
+        2: "subcutaneous_fat",
+        3: "visceral_fat",
+        4: "muscle_fat"
+    },
     "test": {
         1: "carpal"
     }

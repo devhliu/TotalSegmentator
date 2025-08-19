@@ -29,6 +29,7 @@ def main():
                                                  "lung_nodules", "kidney_cysts", "breasts", "ventricle_parts",
                                                  "thigh_shoulder_muscles", "thigh_shoulder_muscles_mr", 
                                                  "liver_segments", "liver_segments_mr",
+                                                 "muscle_fat_composition",
                                                 #  "aortic_sinuses", 
                                                  "all"],
                         help="Task for which to download the weights", default="total")
@@ -63,6 +64,7 @@ def main():
         "liver_segments_mr": [576],
         "craniofacial_structures": [115],
         "abdominal_muscles": [952],
+        "muscle_fat_composition": [1001],
         
         "heartchambers_highres": [301],
         "appendicular_bones": [304],

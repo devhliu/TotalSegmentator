@@ -1,6 +1,12 @@
 ## Master
+* update `heartchambers_highres` task: add postprocessing to remove segmentations outside of heart (+10mm). This fixes the issue of sometimes wrong heart segmentations in the liver or spleen. Also use the `robust_crop` option per default now for the heart chambers task.
+
+
+## Release 2.11.0
 * add multilabel input support to `totalseg_combine_masks`
 * remove numpy < 2 requirement
+* add `teeth` task
+* **IMPORTANT**: increase nnunetv2 requirement from >=2.2.1 to >=2.3.1 to support model trained on the latest nnunetv2 version (2.6.2) (i.e. `teeth` task)
 
 
 ## Release 2.10.0

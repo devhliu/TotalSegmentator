@@ -322,11 +322,14 @@ def download_pretrained_weights(task_id):
     elif task_id == 952:
         weights_path = config_dir / "Dataset952_abdominal_muscles_167subj"
         WEIGHTS_URL = url + "/v2.5.0-weights/Dataset952_abdominal_muscles_167subj.zip"
+    elif task_id == 113:
+        weights_path = config_dir / "Dataset113_ToothFairy3"
+        WEIGHTS_URL = url + "/v2.5.0-weights/Dataset113_ToothFairy3.zip"
     elif task_id == 1001:
         weights_path = config_dir / "Dataset1001_MuscleFatComposition"
         # None-Existing model
         # WEIGHTS_URL = url + "/v2.5.0-weights/Dataset1001_MuscleFatComposition.zip"
-
+    
     # Commercial models
     elif task_id == 304:
         weights_path = config_dir / "Dataset304_appendicular_bones_ext_1559subj"
@@ -413,8 +416,8 @@ def combine_masks(mask_dir, class_type):
     """
     Combine classes to masks
 
-    mask_dir: directory of totalsegmetator masks
-    class_type: ribs | vertebrae | vertebrae_ribs | lung | heart
+    mask_dir: directory of totalsegmetator masks or path to a multilabel nifti file
+    class_type: ribs | vertebrae | vertebrae_ribs | lung | heart | list of custom class names
 
     returns: nibabel image
     """
@@ -436,6 +439,8 @@ def combine_masks(mask_dir, class_type):
         masks = ["femur_left", "femur_right", "hip_left", "hip_right"]
     elif class_type == "body":
         masks = ["body_trunc", "body_extremities"]
+    else:
+        masks = class_type
 
     if mask_dir.is_file():
         img, label_map = load_multilabel_nifti(mask_dir)  # label_map: {id:name}

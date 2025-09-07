@@ -64,8 +64,8 @@ def main():
         "liver_segments_mr": [576],
         "craniofacial_structures": [115],
         "abdominal_muscles": [952],
-        "muscle_fat_composition": [1001],
-        
+        "teeth": [113],    
+        "muscle_fat_composition": [1001],    
         "heartchambers_highres": [301],
         "appendicular_bones": [304],
         "appendicular_bones_mr": [855],

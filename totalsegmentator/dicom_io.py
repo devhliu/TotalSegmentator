@@ -1,6 +1,9 @@
 import os
+import sys
+import time
 import shutil
 import zipfile
+from pathlib import Path
 import subprocess
 import platform
 import importlib.metadata
@@ -8,8 +11,8 @@ import importlib.metadata
 from tqdm import tqdm
 
 import numpy as np
+import nibabel as nib
 import dicom2nifti
-import pydicom
 
 from totalsegmentator.config import get_weights_dir
 from totalsegmentator.dicom_utils import rgb_to_cielab_dicom, generate_random_color, load_snomed_mapping
@@ -132,34 +135,6 @@ def dcm_to_nifti(input_path, output_path, tmp_dir=None, verbose=False):
     dicom2nifti.dicom_series_to_nifti(input_path, output_path, reorient_nifti=True)
 
 
-def load_dicom_series(dicom_dir):
-    """Load all DICOM files from a directory and sort them by instance number."""
-    dicom_files = []
-    supported_modalities = [
-        'CT Image Storage',
-        'MR Image Storage',
-        'Positron Emission Tomography Image Storage',
-        'Nuclear Medicine Image Storage'  # For SPECT
-    ]
-    
-    for root, _, files in os.walk(dicom_dir):
-        for file in files:
-            try:
-                dicom_path = os.path.join(root, file)
-                dcm = pydicom.dcmread(dicom_path, force=True)
-                if hasattr(dcm, 'SOPClassUID') and dcm.SOPClassUID.name in supported_modalities:
-                    dicom_files.append(dcm)
-            except:
-                pass
-    
-    if not dicom_files:
-        raise ValueError("No supported DICOM files found. Supported modalities: CT, MR, PET, SPECT")
-    
-    # Sort by instance number
-    dicom_files.sort(key=lambda x: int(x.InstanceNumber))
-    return dicom_files
-
-
 def save_mask_as_rtstruct(img_data, selected_classes, dcm_reference_file, output_path):
     """
     dcm_reference_file: a directory with dcm slices ??
@@ -171,22 +146,20 @@ def save_mask_as_rtstruct(img_data, selected_classes, dcm_reference_file, output
     # create new RT Struct - requires original DICOM
     rtstruct = RTStructBuilder.create_new(dicom_series_path=dcm_reference_file)
 
-    # Rotate segmentation to match DICOM orientation
-    img_data_rotated = np.rot90(img_data, 1, (0, 1))  # rotate segmentation in-plane
-
     # add mask to RT Struct
     for class_idx, class_name in tqdm(selected_classes.items()):
-        binary_img = img_data_rotated == class_idx
-        if class_name[0].islower(): continue  # skip first non upper character
+        binary_img = img_data == class_idx
         if binary_img.sum() > 0:  # only save none-empty images
-
+            
+            # rotate nii to match DICOM orientation
+            binary_img = np.rot90(binary_img, 1, (0, 1))  # rotate segmentation in-plane
+            
             # add segmentation to RT Struct
             rtstruct.add_roi(
                 mask=binary_img,  # has to be a binary numpy array
                 name=class_name
             )
-
-    # Save the RT Struct without unsupported keyword arguments
+    
     rtstruct.save(str(output_path))
 
 

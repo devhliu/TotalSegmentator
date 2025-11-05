@@ -328,7 +328,7 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                          trainer="nnUNetTrainerV2", tta=False, multilabel_image=True,
                          resample=None, crop=None, crop_path=None, task_name="total", nora_tag="None", preview=False,
                          save_binary=False, nr_threads_resampling=1, nr_threads_saving=6, force_split=False,
-                         crop_addon=[3,3,3], roi_subset=None, output_type="nifti", dicom_format="rtstruct",
+                         crop_addon=[3,3,3], roi_subset=None, output_type="nifti",
                          statistics=False, quiet=False, verbose=False, test=0, skip_saving=False,
                          device="cuda", exclude_masks_at_border=True, no_derived_masks=False,
                          v1_order=False, stats_aggregation="mean", remove_small_blobs=False,

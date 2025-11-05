@@ -65,7 +65,7 @@ def main():
                         "brain_structures", "liver_vessels", "oculomotor_muscles",
                         "thigh_shoulder_muscles", "thigh_shoulder_muscles_mr", "lung_nodules", "kidney_cysts", 
                         "breasts", "ventricle_parts", "aortic_sinuses", "liver_segments", "liver_segments_mr",
-                        "total_highres_test", "craniofacial_structures", "abdominal_muscles", "teeth", "muscle_fat_composition"],
+                        "total_highres_test", "craniofacial_structures", "abdominal_muscles", "teeth"],
                         help="Select which model to use. This determines what is predicted.",
                         default="total")
 
@@ -157,7 +157,7 @@ def main():
     totalsegmentator(args.input, args.output, args.ml, args.nr_thr_resamp, args.nr_thr_saving,
                      args.fast, args.nora_tag, args.preview, args.task, args.roi_subset,
                      args.statistics, args.radiomics, args.crop_path, args.body_seg,
-                     args.force_split, args.output_type, args.dicom_format, args.quiet, args.verbose, args.test, args.skip_saving,
+                     args.force_split, args.output_type, args.quiet, args.verbose, args.test, args.skip_saving,
                      args.device, args.license_number, not args.stats_include_incomplete,
                      args.no_derived_masks, args.v1_order, args.fastest, args.roi_subset_robust,
                      "mean", args.remove_small_blobs, False, args.robust_crop, args.higher_order_resampling,

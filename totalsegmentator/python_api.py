@@ -96,7 +96,7 @@ def show_license_info():
 def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]=None, ml=False, nr_thr_resamp=1, nr_thr_saving=6,
                      fast=False, nora_tag="None", preview=False, task="total", roi_subset=None,
                      statistics=False, radiomics=False, crop_path=None, body_seg=False,
-                     force_split=False, output_type="nifti", dicom_format="rtstruct", quiet=False, verbose=False, test=0,
+                     force_split=False, output_type="nifti", quiet=False, verbose=False, test=0,
                      skip_saving=False, device="gpu", license_number=None,
                      statistics_exclude_masks_at_border=True, no_derived_masks=False,
                      v1_order=False, fastest=False, roi_subset_robust=None, stats_aggregation="mean",
@@ -131,12 +131,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
     
     if output_type == "dicom_rtstruct":
         try:
-            if dicom_format == "rtstruct":
-                from rt_utils import RTStructBuilder
-            elif dicom_format == "seg":
-                import highdicom
-            else:
-                raise ValueError(f"Invalid DICOM format: {dicom_format}. Must be 'rtstruct' or 'seg'.")
+            from rt_utils import RTStructBuilder
         except ImportError:
             raise ImportError("rt_utils is required for output_type='dicom_rtstruct'. Please install it with 'pip install rt_utils'.")
     
@@ -601,16 +596,6 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         if fast: raise ValueError("task aortic_sinuses does not work with option --fast")
         show_license_info()
 
-    elif task == "muscle_fat_composition":
-        task_id = 1001
-        resample = 1.0  # Based on recommended spacing [1.0, 1.0, 1.0]
-        trainer = "nnUNetTrainer"  # Default trainer for 2d configuration
-        crop_addon = [20, 20, 20]  # Keep existing crop addon for abdominal region
-        crop = None  # No specific crop region needed
-        model = "2d"  # Based on plans.json showing 2d configuration
-        folds = [0]  # Single fold as shown in checkpoint structure
-        if fast: raise ValueError("task muscle_fat_composition does not work with option --fast")
-
     elif task == "test":
         task_id = [517]
         resample = None
@@ -618,9 +603,6 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         crop = "body"
         model = "3d_fullres"
         folds = [0]
-        
-    else:
-        raise ValueError(f"Unknown task: {task}. Please check the available tasks in the documentation.")
 
     if crop_path is None:
         crop_path = output.parent if output is not None else None

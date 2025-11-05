@@ -764,12 +764,6 @@ class_map = {
         76: "lower_right_second_molar_pulp_fdi147",
         77: "lower_right_third_molar_pulp_fdi148"
     },
-    "muscle_fat_composition": {
-        1: "muscle",
-        2: "subcutaneous_fat",
-        3: "visceral_fat",
-        4: "muscle_fat"
-    },
     "test": {
         1: "carpal"
     }

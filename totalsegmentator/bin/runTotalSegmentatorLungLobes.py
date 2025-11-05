@@ -1,4 +1,4 @@
-# runTS4HERMIA.py
+# runTotalSegmentatorLungLobes.py
 
 import sys
 import subprocess

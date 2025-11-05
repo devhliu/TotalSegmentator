@@ -1,4 +1,4 @@
-# runTS4HERMIA.py
+# runTotalSegmentator.py
 
 import sys
 import subprocess

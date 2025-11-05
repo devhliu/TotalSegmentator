@@ -129,7 +129,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
     device = select_device(device)
     if verbose: print(f"Using Device: {device}")
     
-    if output_type == "dicom":
+    if output_type == "dicom_rtstruct":
         try:
             if dicom_format == "rtstruct":
                 from rt_utils import RTStructBuilder
@@ -138,12 +138,13 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
             else:
                 raise ValueError(f"Invalid DICOM format: {dicom_format}. Must be 'rtstruct' or 'seg'.")
         except ImportError:
-            if dicom_format == "rtstruct":
-                raise ImportError("rt_utils is required for output_type='dicom' with format='rtstruct'. Please install it with 'pip install rt_utils'.")
-            elif dicom_format == "seg":
-                raise ImportError("highdicom is required for output_type='dicom' with format='seg'. Please install it with 'pip install highdicom'.")
-            else:
-                raise ValueError(f"Invalid DICOM format: {dicom_format}. Must be 'rtstruct' or 'seg'.")
+            raise ImportError("rt_utils is required for output_type='dicom_rtstruct'. Please install it with 'pip install rt_utils'.")
+    
+    if output_type == "dicom_seg":
+        try:
+            import highdicom
+        except ImportError:
+            raise ImportError("highdicom is required for output_type='dicom_seg'. Please install it with 'pip install highdicom'.")
 
     if not quiet:
         print("\nIf you use this tool please cite: https://pubs.rsna.org/doi/10.1148/ryai.230024\n")

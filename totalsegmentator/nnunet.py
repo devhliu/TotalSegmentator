@@ -353,8 +353,12 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
         file_out = Path(file_out)
     multimodel = type(task_id) is list
 
-    if img_type == "nifti" and output_type == "dicom":
-        raise ValueError("To use output type dicom you also have to use a Dicom image as input.")
+    if img_type == "nifti" and (output_type == "dicom_rtstruct" or output_type == "dicom_seg"):
+        raise ValueError("To use output type dicom_rtstruct or dicom_seg you also have to use a Dicom image as input.")
+
+    # These outputs always result in a single multilabel file
+    if output_type == "dicom_rtstruct" or output_type == "dicom_seg":
+        multilabel_image = True
 
     if task_name == "total":
         class_map_parts = class_map_5_parts
@@ -734,16 +738,12 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
             if roi_subset is not None:
                 selected_classes = {k:v for k, v in selected_classes.items() if v in roi_subset}
 
-            if output_type == "dicom":
-                file_out.mkdir(exist_ok=True, parents=True)
-                if dicom_format == "rtstruct":
-                    save_mask_as_rtstruct(img_data, selected_classes, file_in_dcm, file_out / "segmentations_rtstruct.dcm")
-                elif dicom_format == "seg":
-                    save_mask_as_dicomseg(img_data, selected_classes, file_in_dcm, file_out / "segmentations_seg.dcm")
-                else:
-                    raise ValueError(f"Invalid DICOM format: {dicom_format}. Must be 'rtstruct' or 'seg'.")
-                if not quiet: print(f"Saved segmentation as DICOM {dicom_format.upper()} to {file_out / 'segmentations_rtstruct_seg.dcm'}")
-
+            if output_type == "dicom_rtstruct":
+                # file_out.mkdir(exist_ok=True, parents=True)
+                save_mask_as_rtstruct(img_data, selected_classes, file_in_dcm, file_out)
+            elif output_type == "dicom_seg":
+                # file_out.mkdir(exist_ok=True, parents=True)
+                save_mask_as_dicomseg(img_data, selected_classes, file_in_dcm, file_out, img_out.affine)
             else:
                 st = time.time()
                 if multilabel_image:

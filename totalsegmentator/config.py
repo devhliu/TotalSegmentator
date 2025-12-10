@@ -17,7 +17,8 @@ def get_totalseg_dir():
         totalseg_dir = Path(os.environ["TOTALSEG_HOME_DIR"])
     else:
         # in docker container finding home not properly working therefore map to /tmp
-        
+        # python executable parent path for example: /usr/local/bin/models/totalsegmentator in linux
+        # python executable path for example: ~/anaconda3/models/totalsegmetator in windows
         totalseg_dir = Path(os.path.join(os.path.dirname(sys.executable), "models", "totalsegmentator"))
         os.makedirs(totalseg_dir, exist_ok=True)
     return totalseg_dir

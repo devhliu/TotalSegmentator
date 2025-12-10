@@ -150,7 +150,7 @@ def main():
     with open(args.output_file, "w") as f:
         f.write(json.dumps(res, indent=4))
 
-    send_usage_stats_application("get_modality")
+    # send_usage_stats_application("get_modality")
 
 
 if __name__ == "__main__":

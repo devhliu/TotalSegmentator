@@ -373,4 +373,4 @@ if __name__ == "__main__":
     # nib.save(masks["skull_mask"], str(args.output_file).replace(".json", "_skull_mask.nii.gz"))
     # nib.save(masks["ventricle_mask"], str(args.output_file).replace(".json", "_ventricle_mask.nii.gz"))
 
-    send_usage_stats_application("evans_index")
+    # send_usage_stats_application("evans_index")

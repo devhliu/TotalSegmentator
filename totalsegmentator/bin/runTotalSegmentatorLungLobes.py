@@ -22,8 +22,7 @@ def main():
     # Construct the command
     cmd = [
         "TotalSegmentator",
-        "-ot", "dicom",
-        "-df", "rtstruct",
+        "-ot", "dicom_seg",
         "-ml",
         "-f",
         "-ta", "total",

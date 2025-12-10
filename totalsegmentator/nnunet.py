@@ -378,6 +378,9 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
     # Keep only voxel values corresponding to the roi_subset
     if roi_subset is not None:
         label_map = {k: v for k, v in label_map.items() if v in roi_subset}
+    
+    # Only keep labels that start with an uppercase letter
+    label_map = {k: v for k, v in label_map.items() if v[0].isupper()}
             
     # for debugging
     # tmp_dir = file_in.parent / ("nnunet_tmp_" + ''.join(random.Random().choices(string.ascii_uppercase + string.digits, k=8)))
@@ -738,6 +741,9 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
             selected_classes = class_map[task_name]
             if roi_subset is not None:
                 selected_classes = {k:v for k, v in selected_classes.items() if v in roi_subset}
+            
+            # Only keep labels that start with an uppercase letter
+            selected_classes = {k:v for k, v in selected_classes.items() if v[0].isupper()}
 
             if output_type == "dicom_rtstruct":
                 # file_out.mkdir(exist_ok=True, parents=True)

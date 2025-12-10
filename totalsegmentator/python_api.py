@@ -459,7 +459,14 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         model = "3d_lowres_high"
         folds = [0]
         if fast: raise ValueError("task teeth does not work with option --fast")
-
+    elif task == "trunk_cavities":
+        task_id = 343
+        resample = [1.5, 1.5, 1.5]
+        trainer = "nnUNetTrainer"
+        crop = None
+        model = "3d_fullres"
+        folds = [0]
+        if fast: raise ValueError("task trunk_cavities does not work with option --fast")
         
     # Commercial models
     elif task == "vertebrae_body":
@@ -758,7 +765,11 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         if not quiet: print("Calculating statistics...")
         st = time.time()
         if output is not None:
-            stats_dir = output.parent if ml else output
+            # For DICOM output types, output is always a file path, so use parent directory
+            if output_type in ["dicom_seg", "dicom_rtstruct"]:
+                stats_dir = output.parent
+            else:
+                stats_dir = output.parent if ml else output
             stats_file = stats_dir / "statistics.json"
         else:
             stats_file = None

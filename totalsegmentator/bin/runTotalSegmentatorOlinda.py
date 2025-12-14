@@ -3,62 +3,38 @@
 import sys
 import subprocess
 from pathlib import Path
+import argparse
 
 def main():
     """
     Run TotalSegmentator with specific parameters for MR segmentation
-    
-    Args:
-        input_path: Path to the input DICOM or NIFTI file
-        output_path: Path where to save the segmentation results
     """
-    input_path = sys.argv[3]
-    output_path = sys.argv[2]
-    output_type = sys.argv[4]
-
-    # Check if output_type is valid
-    if output_type not in ["dicom_seg", "dicom_rtstruct", "nifti"]:
-        print(f"Error: Invalid output_type '{output_type}'. Must be 'dicom_seg', 'dicom_rtstruct', or 'nifti'.", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Run TotalSegmentator with specific parameters for MR segmentation")
+    parser.add_argument("input_folder", help="Path to the input DICOM or NIFTI file")
+    parser.add_argument("output_path", help="Path where to save the segmentation results")
+    parser.add_argument("-ot", "--output_type", choices=["dicom_seg", "dicom_rtstruct", "nifti"], 
+                        required=True, help="Output type: dicom_seg, dicom_rtstruct, or nifti")
+    
+    args = parser.parse_args()
+    
+    input_path = args.input_folder
+    output_path = args.output_path
+    output_type = args.output_type
 
     # Ensure paths are absolute
     input_path = Path(input_path).absolute()
     output_path = Path(output_path).absolute()
     
     # Construct the command
-    if output_type == "dicom_seg":
-        cmd = [
-            "TotalSegmentator",
-            "-ot", "dicom_seg",
-            "-ml",
-            "-f",
-            "-ta", "total_mr",
-            "-i", str(input_path),
-            "-o", str(output_path)
-        ]
-    elif output_type == "dicom_rtstruct":
-        cmd = [
-            "TotalSegmentator",
-            "-ot", "dicom_rtstruct",
-            "-ml",
-            "-f",
-            "-ta", "total_mr",
-            "-i", str(input_path),
-            "-o", str(output_path)
-        ]
-    elif output_type == "nifti":
-        cmd = [
-            "TotalSegmentator",
-            "-ot", "nifti",
-            "-ml",
-            "-f",
-            "-ta", "total_mr",
-            "-i", str(input_path),
-            "-o", str(output_path)
-        ]
-    else:
-        print(f"Error: Invalid output_type '{output_type}'. Must be 'dicom_seg', 'dicom_rtstruct', or 'nifti'.", file=sys.stderr)
-        sys.exit(1)
+    cmd = [
+        "TotalSegmentator",
+        "-ot", output_type,
+        "-ml",
+        "-f",
+        "-ta", "total_mr",
+        "-i", str(input_path),
+        "-o", str(output_path)
+    ]
     
     print(f"Running command: {' '.join(cmd)}")
 
@@ -76,10 +52,6 @@ def main():
         print(f"Unexpected error: {e}", file=sys.stderr)
         sys.exit(1)
 
-"""
-    # Fix the warnings by explicitly setting transfer syntax parameters
-    rtstruct.save(str(output_path), little_endian=True, implicit_vr=False)
-"""
 
 if __name__ == "__main__":
     main()

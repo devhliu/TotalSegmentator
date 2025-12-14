@@ -18,6 +18,8 @@ import nibabel as nib
 from totalsegmentator.map_to_binary import class_map, class_map_5_parts, commercial_models
 from totalsegmentator.config import get_totalseg_dir, get_weights_dir, is_valid_license, has_valid_license, has_valid_license_offline, get_version
 from totalsegmentator.nifti_ext_header import load_multilabel_nifti
+
+
 """
 Helpers to suppress stdout prints from nnunet
 https://stackoverflow.com/questions/2828953/silence-the-stdout-of-a-function-in-python-without-trashing-sys-stdout-and-resto
@@ -35,6 +37,30 @@ def nostdout(verbose=False):
         sys.stdout = save_stdout
     else:
         yield
+
+
+def robust_rmtree(path, max_retries=3, delay=0.5):
+    """
+    Robustly remove a directory tree, handling issues with NFS and network filesystems.
+    
+    Args:
+        path: Path to directory to remove
+        max_retries: Maximum number of retry attempts
+        delay: Delay in seconds between retries
+    """
+    for attempt in range(max_retries):
+        try:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+            return  # Success
+        except OSError as e:
+            if attempt < max_retries - 1:
+                # Wait and retry
+                time.sleep(delay)
+                delay *= 2  # Exponential backoff
+            else:
+                # Last attempt failed, raise the error
+                raise OSError(f"Failed to remove {path} after {max_retries} attempts: {e}")
 
 
 def download_model_with_license_and_unpack(task_name, config_dir):
@@ -328,6 +354,9 @@ def download_pretrained_weights(task_id):
     elif task_id == 343:
         weights_path = config_dir / "Dataset343_mediastinum_1786subj"
         WEIGHTS_URL = url + "/v2.5.0-weights/Dataset343_mediastinum_1786subj.zip"
+    elif task_id == 615:
+        weights_path = config_dir / "Dataset615_MAXIMUS"
+        WEIGHTS_URL = url + "/v2.5.0-weights/Dataset615_MAXIMUS.zip"
 
     # Commercial models
     elif task_id == 304:
@@ -362,7 +391,7 @@ def download_pretrained_weights(task_id):
 
     for old_weight in old_weights:
         if (config_dir / old_weight).exists():
-            shutil.rmtree(config_dir / old_weight)
+            robust_rmtree(config_dir / old_weight)
 
     if not weights_path.exists():
 

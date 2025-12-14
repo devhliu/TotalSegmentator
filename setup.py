@@ -53,7 +53,7 @@ setup(name='TotalSegmentator',
         entry_points={
             'console_scripts': [
                 'TotalSegmentator=totalsegmentator.bin.TotalSegmentator:main',
-                'runTotalSegmentator=totalsegmentator.bin.runTotalSegmentator:main',
+                'runTotalSegmentatorOlinda=totalsegmentator.bin.runTotalSegmentatorOlinda:main',
                 'runTotalSegmentatorLungLobes=totalsegmentator.bin.runTotalSegmentatorLungLobes:main',
                 'totalseg_combine_masks=totalsegmentator.bin.totalseg_combine_masks:main',
                 'crop_to_body=totalsegmentator.bin.crop_to_body:main',

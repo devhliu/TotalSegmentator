@@ -342,6 +342,6 @@ def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output
         software_versions=version,
         device_serial_number="1"
     )
-    
+        
     # Save DICOM SEG file
     seg.save_as(str(output_path))

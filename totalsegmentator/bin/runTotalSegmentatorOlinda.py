@@ -14,21 +14,51 @@ def main():
     """
     input_path = sys.argv[3]
     output_path = sys.argv[2]
+    output_type = sys.argv[4]
+
+    # Check if output_type is valid
+    if output_type not in ["dicom_seg", "dicom_rtstruct", "nifti"]:
+        print(f"Error: Invalid output_type '{output_type}'. Must be 'dicom_seg', 'dicom_rtstruct', or 'nifti'.", file=sys.stderr)
+        sys.exit(1)
 
     # Ensure paths are absolute
     input_path = Path(input_path).absolute()
     output_path = Path(output_path).absolute()
     
     # Construct the command
-    cmd = [
-        "TotalSegmentator",
-        "-ot", "dicom_seg",
-        "-ml",
-        "-f",
-        "-ta", "total_mr",
-        "-i", str(input_path),
-        "-o", str(output_path)
-    ]
+    if output_type == "dicom_seg":
+        cmd = [
+            "TotalSegmentator",
+            "-ot", "dicom_seg",
+            "-ml",
+            "-f",
+            "-ta", "total_mr",
+            "-i", str(input_path),
+            "-o", str(output_path)
+        ]
+    elif output_type == "dicom_rtstruct":
+        cmd = [
+            "TotalSegmentator",
+            "-ot", "dicom_rtstruct",
+            "-ml",
+            "-f",
+            "-ta", "total_mr",
+            "-i", str(input_path),
+            "-o", str(output_path)
+        ]
+    elif output_type == "nifti":
+        cmd = [
+            "TotalSegmentator",
+            "-ot", "nifti",
+            "-ml",
+            "-f",
+            "-ta", "total_mr",
+            "-i", str(input_path),
+            "-o", str(output_path)
+        ]
+    else:
+        print(f"Error: Invalid output_type '{output_type}'. Must be 'dicom_seg', 'dicom_rtstruct', or 'nifti'.", file=sys.stderr)
+        sys.exit(1)
     
     print(f"Running command: {' '.join(cmd)}")
 

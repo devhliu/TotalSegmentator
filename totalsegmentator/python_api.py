@@ -161,6 +161,9 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
     remove_outside = None
     remove_outside_dilation = None
     remove_mask = None
+    modality = None
+    
+    # Important: 'resample' expects [x,y,z] but in nnUNet plans.json file it is [z,y,x]. So when copying from plans.json make sure to reverse the order.
     
     if task == "total":
         if fast:
@@ -402,7 +405,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         if fast: raise ValueError("task breasts does not work with option --fast")
     elif task == "ventricle_parts":
         task_id = 552
-        resample = [1.0, 0.4345703125, 0.4384765625]
+        resample = [0.4384765625, 0.4345703125, 1.0]
         trainer = "nnUNetTrainerNoMirroring"
         crop = ["brain"]
         crop_addon = [0, 0, 0]
@@ -411,7 +414,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         if fast: raise ValueError("task ventricle_parts does not work with option --fast")
     elif task == "liver_segments":
         task_id = 570
-        resample = [1.5, 0.8046879768371582, 0.8046879768371582]
+        resample = [0.8046879768371582, 0.8046879768371582, 1.5]
         trainer = "nnUNetTrainerNoMirroring"
         crop = ["liver"]
         crop_addon = [10, 10, 10]
@@ -420,7 +423,7 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         if fast: raise ValueError("task liver_segments does not work with option --fast")
     elif task == "liver_segments_mr":
         task_id = 576
-        resample = [3.0, 1.1875, 1.1250001788139343]
+        resample = [1.1250001788139343, 1.1875, 3.0]
         trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
         crop = ["liver"]
         crop_addon = [10, 10, 10]
@@ -467,7 +470,16 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         model = "3d_fullres"
         folds = [0]
         if fast: raise ValueError("task trunk_cavities does not work with option --fast")
-        
+    elif task == "brain_aneurysm":
+        task_id = 615
+        resample = [0.390625, 0.390625, 0.5000016391277313]
+        trainer = "nnUNetTrainerDiceTopK10Loss_2000epochs"
+        crop = None  # no cropping needed, because TOF MRI images only cover brain
+        model = "3d_fullres"
+        folds = None
+        if not quiet: print("INFO: This task only works with TOF MRI images.\n")
+        if fast: raise ValueError("task brain_aneurysm does not work with option --fast")
+
     # Commercial models
     elif task == "vertebrae_body":
         task_id = 305
@@ -678,7 +690,10 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
                 else:
                     crop_model_task = 298
                     crop_spacing = 6.0
-            crop_task = "total_mr" if task.endswith("_mr") else "total"
+            if task.endswith("_mr") or modality == "mr":
+                crop_task = "total_mr"
+            else:
+                crop_task = "total"
             crop_trainer = "nnUNetTrainer_2000epochs_NoMirroring" if task.endswith("_mr") else "nnUNetTrainer_4000epochs_NoMirroring"
             if crop is not None and ("body_trunc" in crop or "body_extremities" in crop):
                 crop_model_task = 300
@@ -734,7 +749,6 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
         crop = body_seg
         if verbose: print(f"Rough body segmentation generated in {time.time()-st:.2f}s")
 
-    folds = [0]  # None
     seg_img, ct_img, stats = nnUNet_predict_image(input, output, task_id, model=model, folds=folds,
                             trainer=trainer, tta=False, multilabel_image=ml, resample=resample,
                             crop=crop, crop_path=crop_path, task_name=task, nora_tag=nora_tag, preview=preview,

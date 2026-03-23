@@ -184,19 +184,19 @@ def main():
     args.output_type = normalized_output_type[0] if len(normalized_output_type) == 1 else normalized_output_type
 
     # Auto-select task from DICOM Modality when input is DICOM
-    if args.input.exists() and not str(args.input).endswith((".nii", ".nii.gz")):
-        try:
-            from totalsegmentator.dicom_io import detect_dicom_modality
-            modality = detect_dicom_modality(args.input)
-            if modality is not None:
-                if modality.upper() == "CT" and args.task == "total_mr":
-                    print("WARNING: you tried to run MR model, but input modality is CT. Will run CT model instead.")
-                    args.task = "total"
-                elif modality.upper() == "MR" and args.task == "total":
-                    print("WARNING: you tried to run CT model, but input modality is MR. Will run MR model instead.")
-                    args.task = "total_mr"
-        except Exception:
-            pass
+    # if args.input.exists() and not str(args.input).endswith((".nii", ".nii.gz")):
+    #     try:
+    #         from totalsegmentator.dicom_io import detect_dicom_modality
+    #         modality = detect_dicom_modality(args.input)
+    #         if modality is not None:
+    #             if modality.upper() == "CT" and args.task == "total_mr":
+    #                 print("WARNING: you tried to run MR model, but input modality is CT. Will run CT model instead.")
+    #                 args.task = "total"
+    #             elif modality.upper() == "MR" and args.task == "total":
+    #                 print("WARNING: you tried to run CT model, but input modality is MR. Will run MR model instead.")
+    #                 args.task = "total_mr"
+    #     except Exception:
+    #         pass
 
     totalsegmentator(args.input, args.output, args.ml, args.nr_thr_resamp, args.nr_thr_saving,
                      args.fast, args.nora_tag, args.preview, args.task, args.roi_subset,

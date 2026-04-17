@@ -20,7 +20,7 @@ If you use it please cite our [Radiology AI paper](https://pubs.rsna.org/doi/10.
 TotalSegmentator works on Ubuntu, Mac, and Windows and on CPU and GPU.
 
 Install dependencies:
-* Python >= 3.9
+* Python >= 3.10
 * [PyTorch](http://pytorch.org/) >= 2.0.0
 
 Optionally:
@@ -136,7 +136,7 @@ If you want to know which contrast phase a CT image is you can use the following
 totalseg_get_phase -i ct.nii.gz -o contrast_phase.json
 ```
 
-If you want to know body weight, size, age and sex you can use the following command (requires `pip install xgboost`). More details can be found [here](resources/body_stats_prediction.md):
+If you want to know body weight, size, age and sex you can use the following command (requires `pip install xgboost monai`). More details can be found [here](resources/body_stats_prediction.md):
 ```bash
 totalseg_get_body_stats -i ct.nii.gz -o body_stats.json -m ct
 ```

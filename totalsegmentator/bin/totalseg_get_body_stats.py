@@ -15,6 +15,9 @@ import nibabel as nib
 import numpy as np
 import xgboost as xgb
 
+from totalsegmentator.cnn import (
+    predict_body_stats_with_cnn,
+)
 from totalsegmentator.python_api import totalsegmentator
 from totalsegmentator.config import get_totalseg_dir, get_weights_dir, send_usage_stats_application
 from totalsegmentator.nifti_ext_header import load_multilabel_nifti
@@ -44,6 +47,8 @@ def check_body_stats_models_exist():
             # Check if all 5 folds exist
             for fold_idx in range(5):
                 model_file = Path(f"{base_path}.{fold_idx}")
+                # For future models do
+                # model_file = Path(f"{base_path}_fold{fold_idx}.json")
                 if not model_file.exists():
                     return False
     return True
@@ -61,6 +66,8 @@ def load_models(classifier_path, target, fold=None):
         else:
             clf = xgb.XGBRegressor(device="cpu")
         clf.load_model(f"{classifier_path}.{fold_idx}")
+        # For future models do
+        # clf.load_model(f"{classifier_path}_fold{fold_idx}.json")
         clfs[fold_idx] = clf
     return clfs
 
@@ -248,7 +255,8 @@ def get_body_stats(img, modality: str, f_type: str = "niigz", model_file: Path =
                    quiet: bool = False, device: str = "gpu", 
                    existing_stats: dict = None, existing_seg_img: nib.Nifti1Image = None,
                    fold: int = None, license_number: str = None, use_border: bool = False,
-                   call_via_subprocess: bool = False):
+                   call_via_subprocess: bool = False, model_type: str = "xgboost",
+                   only_weight: bool = False):
     """
     Predict body weight, body size, age and sex based on a CT or MR scan.
     Also calculates BMI and body surface area based on the predicted values.
@@ -268,6 +276,10 @@ def get_body_stats(img, modality: str, f_type: str = "niigz", model_file: Path =
         license_number: str, optional
         use_border: bool, optional
         call_via_subprocess: bool, optional - if True, run TotalSegmentator via subprocess
+        model_type: str, optional - "xgboost" for the existing feature-based model,
+            "cnn" to use the 5-fold CNN ensemble for weight prediction
+        only_weight: bool, optional - if True, predict only body weight and skip all
+            other targets and derived measures
     """
     yield {"id": 1, "progress": 2, "status": "Loading data"}
 
@@ -305,10 +317,45 @@ def get_body_stats(img, modality: str, f_type: str = "niigz", model_file: Path =
 
     tissue_types_slices = [f"{tissue}_{vertebra}" for tissue in tissue_types for vertebra in vertebrae]
 
-    if model_file is None and not check_body_stats_models_exist():
+    if model_type == "cnn" and modality != "mr":
+        raise ValueError("The CNN body-stats models currently only support MR images.")
+
+    needs_default_xgboost_models = model_type == "xgboost" and model_file is None
+    if needs_default_xgboost_models and not check_body_stats_models_exist():
         download_pretrained_weights("body_stats")
 
     img = nib.as_closest_canonical(img)  # important to cut tissue slices along correct axis
+
+    if model_type == "cnn":
+        result = {}
+        targets = ["weight"] if only_weight else ["weight", "size", "age", "sex"]
+        target_progress = {
+            "weight": 35,
+            "size": 55,
+            "age": 75,
+            "sex": 90,
+        }
+        for target in targets:
+            yield {
+                "id": 2,
+                "progress": target_progress[target],
+                "status": f"Predicting {target} with CNN ensemble",
+            }
+            result[target] = predict_body_stats_with_cnn(
+                img, target=target, model_dir=model_file, fold=fold, device=device
+            )
+
+        if not only_weight:
+            weight_kg = result["weight"]["value"]
+            height_cm = result["size"]["value"]
+            height_m = height_cm / 100.0
+            bmi = weight_kg / (height_m ** 2)
+            result["bmi"] = {"value": round(bmi, 2), "unit": "kg/m^2"}
+            bsa = float(np.sqrt((height_cm * weight_kg) / 3600))
+            result["bsa"] = {"value": round(bsa, 2), "unit": "m^2"}
+
+        yield {"id": 3, "progress": 100, "status": "Done", "result": result}
+        return
 
     st = time.time()
     vertebrae_seg_img = None
@@ -413,7 +460,8 @@ def get_body_stats(img, modality: str, f_type: str = "niigz", model_file: Path =
     #     print(f"  {name}: {value}")
 
     result = {}
-    for target in ["weight", "size", "age", "sex"]:
+    targets = ["weight"] if only_weight else ["weight", "size", "age", "sex"]
+    for target in targets:
     # for target in ["weight"]:
         if not quiet:
             print(f"Predicting {target}...")
@@ -461,20 +509,21 @@ def get_body_stats(img, modality: str, f_type: str = "niigz", model_file: Path =
                               "unit": "kg" if target == "weight" else "cm" if target == "size" else "years" if target == "age" else None
                               }
     
-    # Calculate BMI and Body Surface Area based on predicted values
-    weight_kg = result["weight"]["value"]
-    height_cm = result["size"]["value"]
-    height_m = height_cm / 100.0
-    
-    # BMI = weight(kg) / height(m)^2
-    bmi = weight_kg / (height_m ** 2)
-    result["bmi"] = {"value": round(bmi, 2), 
-                     "unit": "kg/m^2"}
-    
-    # Body Surface Area (Mosteller formula): BSA = sqrt(height(cm) x weight(kg) / 3600)
-    bsa = float(np.sqrt((height_cm * weight_kg) / 3600))
-    result["bsa"] = {"value": round(bsa, 2), 
-                     "unit": "m^2"}
+    if not only_weight:
+        # Calculate BMI and Body Surface Area based on predicted values
+        weight_kg = result["weight"]["value"]
+        height_cm = result["size"]["value"]
+        height_m = height_cm / 100.0
+        
+        # BMI = weight(kg) / height(m)^2
+        bmi = weight_kg / (height_m ** 2)
+        result["bmi"] = {"value": round(bmi, 2), 
+                         "unit": "kg/m^2"}
+        
+        # Body Surface Area (Mosteller formula): BSA = sqrt(height(cm) x weight(kg) / 3600)
+        bsa = float(np.sqrt((height_cm * weight_kg) / 3600))
+        result["bsa"] = {"value": round(bsa, 2), 
+                         "unit": "m^2"}
     
     yield {"id": 8, "progress": 100, "status": "Done", "result": result}
 
@@ -496,11 +545,17 @@ def main():
                         type=lambda p: Path(p).absolute(), required=False, default=None)
     
     parser.add_argument("-mf", metavar="filepath", dest="model_file",
-                        help="path to classifier model",
+                        help="path to classifier model base path (xgboost) or experiment directory (cnn)",
                         type=lambda p: Path(p).absolute(), required=False, default=None)
 
     parser.add_argument("-m", metavar="modality", dest="modality", type=str, choices=["ct", "mr"], required=True,
                         help="Imaging modality: 'ct' or 'mr'")
+
+    parser.add_argument("-mt", "--model_type", type=str, choices=["xgboost", "cnn"], default="xgboost",
+                        help="Prediction backend: 'xgboost' or 'cnn'.")
+
+    parser.add_argument("--only_weight", action="store_true", default=False,
+                        help="Predict only body weight and skip size, age, sex, BMI, and BSA.")
 
     # This does not work, because fast total model anyways has to run to get the vertebrae segmentation
     # needed to get the tissue slices. Only works if also providing existing seg image (can be passed
@@ -541,7 +596,9 @@ def main():
                              model_file=args.model_file, quiet=args.quiet, device=args.device,
                              existing_stats=existing_stats, fold=args.fold,
                              license_number=args.license_number,
-                             call_via_subprocess=args.call_via_subprocess)
+                             call_via_subprocess=args.call_via_subprocess,
+                             model_type=args.model_type,
+                             only_weight=args.only_weight)
 
     for r in res_gen:
         if not args.quiet:

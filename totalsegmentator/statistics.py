@@ -55,7 +55,7 @@ def get_radiomics_features(seg_file, img_file="ct.nii.gz"):
 
 def get_radiomics_features_for_entire_dir(ct_file:Path, mask_dir:Path, file_out:Path):
     masks = sorted(list(mask_dir.glob("*.nii.gz")))
-    stats = [get_radiomics_features(ct_file, mask) for mask in masks]
+    stats = [get_radiomics_features(mask, ct_file) for mask in masks]
     stats = {mask_name: stats for mask_name, stats in stats}
     with open(file_out, "w") as f:
         json.dump(stats, f, indent=4)
@@ -100,7 +100,7 @@ def get_basic_statistics(seg: np.array,
     """
     ct_file: path to a ct_file or a nifti file object
     """
-    ct_img = nib.load(ct_file) if type(ct_file) == pathlib.PosixPath else ct_file
+    ct_img = nib.load(ct_file) if isinstance(ct_file, (str, Path)) else ct_file
     ct = ct_img.get_fdata().astype(np.int16)
     spacing = ct_img.header.get_zooms()
     vox_vol = spacing[0] * spacing[1] * spacing[2]
@@ -133,9 +133,7 @@ def get_basic_statistics(seg: np.array,
             # print(f"took: {time.time()-st:.4f}s")
 
     if file_out is not None:
-        # For nora json is good
-        # For other people csv might be better -> not really because here only for one subject each -> use json
         with open(file_out, "w") as f:
             json.dump(stats, f, indent=4)
-    else:
-        return stats
+
+    return stats
